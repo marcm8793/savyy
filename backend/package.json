@@ -1,0 +1,28 @@
+{
+  "name": "savyy-backend",
+  "version": "1.0.0",
+  "author": "Marc Mansour",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "start:watch": "tsx watch src/index.ts",
+    "build": "tsc",
+    "migrate": "drizzle-kit generate:pg && drizzle-kit push:pg"
+  },
+  "dependencies": {
+    "@fastify/jwt": "^9.1.0",
+    "@trpc/server": "^11.3.0",
+    "better-auth": "^1.2.8",
+    "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.44.2",
+    "fastify": "^5.3.3",
+    "pg": "^8.16.0",
+    "zod": "^3.25.51"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "@types/pg": "^8.15.4",
+    "drizzle-kit": "^0.31.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

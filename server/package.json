@@ -1,6 +1,6 @@
 {
-  "name": "savyy-backend",
-  "version": "1.0.0",
+  "name": "@savyy/server",
+  "version": "0.1.0",
   "author": "Marc Mansour",
   "scripts": {
     "start": "tsx src/index.ts",

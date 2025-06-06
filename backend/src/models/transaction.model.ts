@@ -1,4 +1,3 @@
-import { drizzle } from "drizzle-orm/node-postgres";
 import {
   pgTable,
   serial,
@@ -10,7 +9,7 @@ import {
 // Define transaction schema for Drizzle ORM
 export const transaction = pgTable("transactions", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
   accountId: integer("account_id").notNull(),
   amount: integer("amount").notNull(),
   date: timestamp("date").notNull(),

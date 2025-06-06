@@ -1,15 +1,13 @@
-import { initTRPC } from "@trpc/server";
 import { z } from "zod";
+import { router, publicProcedure } from "../trpc";
 import { accountService } from "../services/accountService";
 
-// Initialize tRPC with context
-const t = initTRPC.create();
-
 // Define account router
-export const accountRouter = t.router({
-  getAccounts: t.procedure
+export const accountRouter = router({
+  getAccounts: publicProcedure
     .input(z.object({ userId: z.string() }))
-    .query(async ({ input }) => {
-      return await accountService.getAccounts(input.userId);
+    .query(async ({ input, ctx }) => {
+      // Use the database from context
+      return await accountService.getAccounts(ctx.db, Number(input.userId));
     }),
 });

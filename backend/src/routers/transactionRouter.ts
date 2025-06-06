@@ -1,15 +1,13 @@
-import { initTRPC } from "@trpc/server";
 import { z } from "zod";
+import { router, publicProcedure } from "../trpc";
 import { transactionService } from "../services/transactionService";
 
-// Initialize tRPC with context
-const t = initTRPC.create();
-
 // Define transaction router
-export const transactionRouter = t.router({
-  getTransactions: t.procedure
+export const transactionRouter = router({
+  getTransactions: publicProcedure
     .input(z.object({ userId: z.string() }))
-    .query(async ({ input }) => {
-      return await transactionService.getTransactions(input.userId);
+    .query(async ({ input, ctx }) => {
+      // You can access ctx.user, ctx.req, ctx.res, ctx.db here
+      return await transactionService.getTransactions(ctx.db, input.userId);
     }),
 });

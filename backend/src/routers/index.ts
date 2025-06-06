@@ -1,13 +1,10 @@
-import { initTRPC } from "@trpc/server";
+import { router } from "../trpc";
 import { authRouter } from "./authRouter";
 import { transactionRouter } from "./transactionRouter";
 import { accountRouter } from "./accountRouter";
 
-// Initialize tRPC
-const t = initTRPC.create();
-
-// Combine all routers
-export const appRouter = t.router({
+// Combine all routers using the centralized tRPC setup
+export const appRouter = router({
   auth: authRouter,
   transaction: transactionRouter,
   account: accountRouter,

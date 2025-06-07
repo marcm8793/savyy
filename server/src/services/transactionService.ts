@@ -4,7 +4,7 @@ import { schema, transaction } from "../../db/schema";
 
 // Transaction service methods
 export const transactionService = {
-  async getTransactions(db: NodePgDatabase<any>, userId: string) {
+  async getTransactions(db: NodePgDatabase<typeof schema>, userId: string) {
     return await db
       .select()
       .from(transaction)
@@ -26,7 +26,7 @@ export const transactionService = {
   },
 
   async createTransaction(
-    db: NodePgDatabase<any>,
+    db: NodePgDatabase<typeof schema>,
     data: typeof transaction.$inferInsert
   ) {
     const result = await db.insert(transaction).values(data).returning();
@@ -35,7 +35,7 @@ export const transactionService = {
   },
 
   async updateTransaction(
-    db: NodePgDatabase<any>,
+    db: NodePgDatabase<typeof schema>,
     id: number,
     data: Partial<typeof transaction.$inferInsert>,
     userId: string
@@ -49,7 +49,11 @@ export const transactionService = {
     return result[0];
   },
 
-  async deleteTransaction(db: NodePgDatabase<any>, id: number, userId: string) {
+  async deleteTransaction(
+    db: NodePgDatabase<typeof schema>,
+    id: number,
+    userId: string
+  ) {
     await db
       .delete(transaction)
       .where(and(eq(transaction.id, id), eq(transaction.userId, userId)));

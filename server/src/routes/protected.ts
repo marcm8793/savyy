@@ -7,7 +7,11 @@ const protectedRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/protected/profile", async (request, reply) => {
     return {
       message: "This is a protected route",
-      user: request.user,
+      user: {
+        id: request.user?.id,
+        name: request.user?.name,
+        email: request.user?.email,
+      },
       session: {
         id: request.session?.id,
         expiresAt: request.session?.expiresAt,

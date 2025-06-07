@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createApp } from "./app";
 
-const PORT = Number(process.env.PORT);
+const PORT = Number(process.env.PORT) || 8080;
 
 // Create and start server
 createApp()

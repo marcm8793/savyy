@@ -71,7 +71,9 @@ export const verification = pgTable("verification", {
 // Define bank account schema for Drizzle ORM
 export const bankAccount = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
   accountName: varchar("account_name", { length: 255 }).notNull(),
   bankId: varchar("bank_id", { length: 255 }).notNull(),
 });
@@ -79,7 +81,9 @@ export const bankAccount = pgTable("bank_accounts", {
 // Define transaction schema for Drizzle ORM
 export const transaction = pgTable("transactions", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id", { length: 255 }).notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
   accountId: integer("account_id").notNull(),
   amount: integer("amount").notNull(),
   date: timestamp("date").notNull(),

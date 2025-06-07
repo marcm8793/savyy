@@ -22,34 +22,37 @@ import type { inferRouterInputs } from "@trpc/server";
 import type { AppRouter } from "@/lib/trpc";
 
 // Use the shared schema from tRPC auth router
-type SignInFormData = inferRouterInputs<AppRouter>["auth"]["signIn"];
+type SignUpFormData = inferRouterInputs<AppRouter>["auth"]["signUp"];
 
-export default function SignInForm() {
+// Create a local version of the schema that matches the tRPC schema
+const signUpValidation = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export default function SignUpForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Define the validation schema for sign in
-  const signInValidation = z.object({
-    email: z.string().email("Please enter a valid email address"),
-    password: z.string().min(1, "Password is required"),
-  });
-
-  const form = useForm<SignInFormData>({
-    resolver: zodResolver(signInValidation),
+  const form = useForm<SignUpFormData>({
+    resolver: zodResolver(signUpValidation),
     defaultValues: {
+      name: "",
       email: "",
       password: "",
     },
   });
 
-  const onSubmit = async (data: SignInFormData) => {
+  const onSubmit = async (data: SignUpFormData) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      await authClient.signIn.email(
+      await authClient.signUp.email(
         {
+          name: data.name,
           email: data.email,
           password: data.password,
         },
@@ -63,7 +66,7 @@ export default function SignInForm() {
           },
           onError: (ctx) => {
             setIsLoading(false);
-            setError(ctx.error.message || "Sign in failed");
+            setError(ctx.error.message || "Sign up failed");
           },
         }
       );
@@ -77,15 +80,43 @@ export default function SignInForm() {
     <div className="flex flex-col gap-6">
       <Card className="overflow-hidden p-0">
         <CardContent className="grid p-0 md:grid-cols-2">
+          <div className="bg-muted relative hidden md:block">
+            <Image
+              src="/sign-up-icon.png"
+              alt="Image"
+              width={500}
+              height={500}
+              className="absolute inset-0 h-full dark:brightness-[0.8] brightness-[0.9]"
+            />
+          </div>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 md:p-8">
               <div className="flex flex-col gap-6">
                 <div className="flex flex-col items-center text-center">
-                  <h1 className="text-2xl font-bold">Welcome back</h1>
+                  <h1 className="text-2xl font-bold">Create your account</h1>
                   <p className="text-muted-foreground text-balance">
-                    Login to your Savyy account
+                    Join Savyy and start managing your finances
                   </p>
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="text"
+                          placeholder="Enter your full name"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -111,19 +142,12 @@ export default function SignInForm() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex items-center">
-                        <FormLabel>Password</FormLabel>
-                        <a
-                          href="#"
-                          className="ml-auto text-sm underline-offset-2 hover:underline"
-                        >
-                          Forgot your password?
-                        </a>
-                      </div>
+                      <FormLabel>Password</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type="password"
+                          placeholder="Enter your password"
                           disabled={isLoading}
                         />
                       </FormControl>
@@ -139,27 +163,18 @@ export default function SignInForm() {
                 )}
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Signing in..." : "Login"}
+                  {isLoading ? "Creating account..." : "Sign Up"}
                 </Button>
 
                 <div className="text-center text-sm">
-                  Don&apos;t have an account?{" "}
+                  Already have an account?{" "}
                   <a href="#" className="underline underline-offset-4">
-                    Sign up
+                    Sign in
                   </a>
                 </div>
               </div>
             </form>
           </Form>
-          <div className="bg-muted relative hidden md:block">
-            <Image
-              src="/sign-in-icon.png"
-              alt="Image"
-              width={500}
-              height={500}
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.8] brightness-[0.9]"
-            />
-          </div>
         </CardContent>
       </Card>
       <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">

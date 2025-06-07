@@ -1,18 +1,19 @@
 "use client";
 
 import { useSession } from "@/lib/auth-client";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
+  const router = useRouter();
 
   useEffect(() => {
     // Redirect to signin if not authenticated
     if (!isPending && !session?.user) {
-      redirect("/signin");
+      router.push("/signin");
     }
-  }, [session, isPending]);
+  }, [session, isPending, router]);
 
   if (isPending) {
     return (

@@ -1,11 +1,10 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTRPC } from "../../lib/trpc";
+import { useQueryClient } from "@tanstack/react-query";
+import { trpc } from "../../lib/trpc";
 import { useSession, authClient } from "../../lib/auth-client";
 
 export function UserProfile() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   // Get session from Better Auth
@@ -16,21 +15,22 @@ export function UserProfile() {
   } = useSession();
 
   // Get session from tRPC (this will use the Better Auth session)
-  const trpcSessionQuery = useQuery(trpc.auth.getSession.queryOptions());
+  const trpcSessionQuery = trpc.auth.getSession.useQuery();
 
   // Get user profile if authenticated
-  const profileQuery = useQuery({
-    ...trpc.auth.getProfile.queryOptions(),
-    enabled: session?.user != null,
-  });
+  const profileQuery = trpc.auth.getProfile.useQuery(
+    undefined, // no input needed
+    {
+      enabled: session?.user != null,
+    }
+  );
 
   // Update profile mutation
-  const updateProfileMutation = useMutation({
-    ...trpc.auth.updateProfile.mutationOptions(),
+  const updateProfileMutation = trpc.auth.updateProfile.useMutation({
     onSuccess: () => {
       // Invalidate and refetch profile data after successful update
-      queryClient.invalidateQueries({ queryKey: ["auth", "getProfile"] });
-      queryClient.invalidateQueries({ queryKey: ["auth", "getSession"] });
+      queryClient.invalidateQueries({ queryKey: [["auth", "getProfile"]] });
+      queryClient.invalidateQueries({ queryKey: [["auth", "getSession"]] });
     },
   });
 

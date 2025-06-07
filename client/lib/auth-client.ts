@@ -1,10 +1,8 @@
 import { createAuthClient } from "better-auth/react";
+import { getAuthUrl } from "./config";
 
 export const authClient = createAuthClient({
-  baseURL:
-    process.env.NODE_ENV === "production"
-      ? process.env.NEXT_PUBLIC_AUTH_URL
-      : "http://localhost:3000", // Your server URL
+  baseURL: getAuthUrl(),
 });
 
 // Export commonly used methods for convenience

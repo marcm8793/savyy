@@ -2,11 +2,11 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { httpBatchLink } from "@trpc/client";
 import { useState } from "react";
 import { makeQueryClient } from "../lib/query-client";
-import { TRPCProvider } from "../lib/trpc";
-import type { AppRouter } from "../../server/src/routers";
+import { trpc } from "../lib/trpc";
+import { getTRPCUrl } from "../lib/config";
 
 let browserQueryClient: QueryClient | undefined = undefined;
 
@@ -24,15 +24,6 @@ function getQueryClient() {
   }
 }
 
-function getUrl() {
-  const base = (() => {
-    if (typeof window !== "undefined") return "";
-    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-    return "http://localhost:3000";
-  })();
-  return `${base}/trpc`;
-}
-
 export function TRPCQueryProvider(
   props: Readonly<{
     children: React.ReactNode;
@@ -45,10 +36,10 @@ export function TRPCQueryProvider(
   const queryClient = getQueryClient();
 
   const [trpcClient] = useState(() =>
-    createTRPCClient<AppRouter>({
+    trpc.createClient({
       links: [
         httpBatchLink({
-          url: getUrl(),
+          url: getTRPCUrl(),
           // Include authentication headers from Better Auth
           async headers() {
             const headers: Record<string, string> = {};
@@ -62,10 +53,10 @@ export function TRPCQueryProvider(
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
         {props.children}
-      </TRPCProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </trpc.Provider>
   );
 }

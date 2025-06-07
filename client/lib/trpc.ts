@@ -1,33 +1,40 @@
+import { createTRPCReact } from "@trpc/react-query";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import { createTRPCContext } from "@trpc/tanstack-react-query";
 import type { AppRouter } from "../../server/src/routers";
+import { getTRPCUrl } from "./config";
 
-// Create the tRPC context for React components
-export const { TRPCProvider, useTRPC, useTRPCClient } =
-  createTRPCContext<AppRouter>();
+/**
+ * Create tRPC React hooks for use in components
+ * This is the modern way to set up tRPC with React Query
+ */
+export const trpc = createTRPCReact<AppRouter>();
 
-// Function to get the API URL
-function getUrl() {
-  const base = (() => {
-    if (typeof window !== "undefined") return "";
-    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-    return "http://localhost:3000";
-  })();
-  return `${base}/trpc`;
-}
-
-// Create vanilla tRPC client (for server-side usage)
+/**
+ * Create vanilla tRPC client for server-side usage or non-React contexts
+ * This client can be used in API routes, middleware, or server components
+ */
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
-      url: getUrl(),
-      // You can pass any HTTP headers you wish here
+      url: getTRPCUrl(),
+      // Add authentication headers if needed
       async headers() {
-        return {
-          // Add authorization headers if needed
-          // authorization: getAuthCookie(),
-        };
+        const headers: Record<string, string> = {};
+
+        // Better Auth automatically handles cookies through the browser
+        // For server-side requests, you might need to forward cookies
+        if (typeof window === "undefined") {
+          // Server-side: you can add cookie forwarding here if needed
+          // headers.cookie = getServerSideCookies();
+        }
+
+        return headers;
       },
     }),
   ],
 });
+
+/**
+ * Export the AppRouter type for use in other files
+ */
+export type { AppRouter } from "../../server/src/routers";

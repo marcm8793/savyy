@@ -1,6 +1,6 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, and } from "drizzle-orm";
-import { transaction } from "../../db/schema";
+import { schema, transaction } from "../../db/schema";
 
 // Transaction service methods
 export const transactionService = {
@@ -12,7 +12,7 @@ export const transactionService = {
   },
 
   async getTransactionById(
-    db: NodePgDatabase<any>,
+    db: NodePgDatabase<typeof schema>,
     id: number,
     userId: string
   ) {

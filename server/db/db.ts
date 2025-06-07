@@ -1,59 +1,71 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle, NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool, PoolConfig } from "pg";
 import fp from "fastify-plugin";
 import { FastifyInstance, FastifyPluginCallback } from "fastify";
+import * as schema from "./schema";
 
-// Database plugin options interface
 export interface DatabaseOptions {
   connectionString?: string;
+  poolConfig?: PoolConfig; // Allow pool configuration
 }
 
-// Extend Fastify instance to include our database
+// Factory function - no global state
+export function createDatabase(
+  connectionString?: string,
+  poolConfig?: PoolConfig
+) {
+  const pool = new Pool({
+    connectionString: connectionString || process.env.DATABASE_URL,
+    ...poolConfig,
+  });
+
+  return {
+    db: drizzle(pool, { schema }),
+    pool,
+  };
+}
+
+// For external use (like Better Auth), create when needed
+export function getSharedDatabase() {
+  return createDatabase();
+}
+
 declare module "fastify" {
   interface FastifyInstance {
-    db: ReturnType<typeof drizzle>;
+    db: NodePgDatabase<typeof schema>;
     pg: Pool;
   }
 }
 
-// Database plugin implementation
 const databasePlugin: FastifyPluginCallback<DatabaseOptions> = (
   fastify: FastifyInstance,
   options: DatabaseOptions,
   done
 ) => {
-  // Initialize PostgreSQL connection pool
-  const pool = new Pool({
-    connectionString: options.connectionString || process.env.DATABASE_URL,
-  });
+  const { db: pluginDb, pool: pluginPool } = createDatabase(
+    options.connectionString,
+    options.poolConfig
+  );
 
-  // Initialize Drizzle ORM with the pool
-  const db = drizzle(pool);
+  fastify.decorate("db", pluginDb);
+  fastify.decorate("pg", pluginPool);
 
-  // Decorate Fastify instance with database connections
-  fastify.decorate("db", db);
-  fastify.decorate("pg", pool);
-
-  // Add cleanup hook for graceful shutdown
-  fastify.addHook("onClose", async (instance) => {
-    await pool.end();
+  fastify.addHook("onClose", async () => {
+    await pluginPool.end();
     fastify.log.info("Database connection pool closed");
   });
 
-  // Test the connection
-  pool.connect((err, client, release) => {
+  pluginPool.connect((err, client, release) => {
     if (err) {
       fastify.log.error("Error connecting to database:", err);
       return done(err);
     }
-
     fastify.log.info("Database connected successfully");
     release();
     done();
   });
 };
 
-// Export the plugin wrapped with fastify-plugin
 export default fp(databasePlugin, {
   name: "database-plugin",
   fastify: "5.x",

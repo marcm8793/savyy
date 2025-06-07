@@ -53,7 +53,7 @@
  * - Get session: GET /api/auth/get-session
  */
 
-import { FastifyPluginAsync } from "fastify";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { auth } from "../utils/auth";
 
 // Extend Fastify request type to include user and session
@@ -119,7 +119,10 @@ export const optionalAuthMiddleware: FastifyPluginAsync = async (fastify) => {
 };
 
 // Helper function to require authentication for specific routes
-export const requireAuth = async (request: any, reply: any) => {
+export const requireAuth = async (
+  request: FastifyRequest,
+  reply: FastifyReply
+) => {
   if (!request.user) {
     reply.code(401).send({
       error: "Unauthorized",

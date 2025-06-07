@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../trpc";
 import { transactionService } from "../services/transactionService";
+import { schema } from "../schema";
 
 // Define Zod schemas manually for transactions
 const transactionSchema = z.object({

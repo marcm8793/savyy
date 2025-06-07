@@ -1,8 +1,50 @@
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
 
+// Shared authentication schemas
+export const signInSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export const signUpSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  name: z.string().min(2, "Name must be at least 2 characters"),
+});
+
 // Define authentication router
 export const authRouter = router({
+  // Sign in procedure - handles authentication through Better Auth
+  signIn: publicProcedure
+    .input(signInSchema)
+    .mutation(async ({ input, ctx }) => {
+      // This procedure validates the input but doesn't handle the actual authentication
+      // The actual authentication is handled by Better Auth through the auth client
+      // This is mainly for schema validation and can be used for additional logic
+
+      return {
+        message: "Sign in request validated",
+        email: input.email,
+        // Don't return the password for security
+      };
+    }),
+
+  // Sign up procedure - similar to sign in, for validation and consistency
+  signUp: publicProcedure
+    .input(signUpSchema)
+    .mutation(async ({ input, ctx }) => {
+      // This procedure validates the input but doesn't handle the actual registration
+      // The actual registration is handled by Better Auth through the auth client
+
+      return {
+        message: "Sign up request validated",
+        email: input.email,
+        name: input.name,
+        // Don't return the password for security
+      };
+    }),
+
   // Get current session - public procedure that returns user if authenticated
   getSession: publicProcedure.query(async ({ ctx }) => {
     return {

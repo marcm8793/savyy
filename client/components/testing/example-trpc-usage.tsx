@@ -1,6 +1,6 @@
 "use client";
 
-import { config } from "../lib/config";
+import { config } from "../../lib/config";
 
 export function ExampleTRPCUsage() {
   // Example of how to use queries and mutations with the new setup

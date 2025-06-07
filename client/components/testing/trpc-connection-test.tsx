@@ -1,7 +1,7 @@
 "use client";
 
-import { trpc } from "../lib/trpc";
-import { config } from "../lib/config";
+import { trpc } from "../../lib/trpc";
+import { config } from "../../lib/config";
 
 export function TRPCConnectionTest() {
   // Test the auth.getSession procedure (public, should work without authentication)

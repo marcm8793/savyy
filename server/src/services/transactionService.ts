@@ -1,6 +1,6 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { transaction } from "../models/transaction.model";
 import { eq } from "drizzle-orm";
+import { transaction } from "../schema";
 
 // Transaction service methods
 export const transactionService = {

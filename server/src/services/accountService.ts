@@ -1,7 +1,7 @@
-import { account } from "../models/account.model";
 import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { account } from "../schema";
 
 // Account service methods that accept database instances
 export const accountService = {

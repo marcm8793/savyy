@@ -9,7 +9,7 @@ import {
   authMiddleware,
   optionalAuthMiddleware,
 } from "./middleware/authMiddleware";
-import databasePlugin from "./utils/db";
+import databasePlugin from "../db/db";
 import { auth } from "./utils/auth";
 import fastifyCors from "@fastify/cors";
 

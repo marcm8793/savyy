@@ -6,7 +6,9 @@
     "start": "tsx src/index.ts",
     "start:watch": "tsx watch src/index.ts",
     "build": "tsc",
-    "migrate": "drizzle-kit generate:pg && drizzle-kit push:pg"
+    "db:generate": "drizzle-kit generate:pg",
+    "db:push": "npx drizzle-kit push --config=./config/drizzle.config.ts",
+    "db:studio": "npx drizzle-kit studio --config=./config/drizzle.config.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",

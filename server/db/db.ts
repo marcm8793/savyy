@@ -24,10 +24,7 @@ const databasePlugin: FastifyPluginCallback<DatabaseOptions> = (
 ) => {
   // Initialize PostgreSQL connection pool
   const pool = new Pool({
-    connectionString:
-      options.connectionString ||
-      process.env.DATABASE_URL ||
-      "postgres://user:password@localhost:5432/finance",
+    connectionString: options.connectionString || process.env.DATABASE_URL,
   });
 
   // Initialize Drizzle ORM with the pool

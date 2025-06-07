@@ -2,11 +2,9 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink } from "@trpc/client";
 import { useState } from "react";
 import { makeQueryClient } from "../lib/query-client";
-import { trpc } from "../lib/trpc";
-import { getTRPCUrl } from "../lib/config";
+import { trpc, createTRPCClientConfig } from "../lib/trpc";
 
 let browserQueryClient: QueryClient | undefined = undefined;
 
@@ -36,20 +34,7 @@ export function TRPCQueryProvider(
   const queryClient = getQueryClient();
 
   const [trpcClient] = useState(() =>
-    trpc.createClient({
-      links: [
-        httpBatchLink({
-          url: getTRPCUrl(),
-          // Include authentication headers from Better Auth
-          async headers() {
-            const headers: Record<string, string> = {};
-            // Better Auth automatically handles cookies through the browser
-            // No need to manually set cookies for same-origin requests
-            return headers;
-          },
-        }),
-      ],
-    })
+    trpc.createClient(createTRPCClientConfig())
   );
 
   return (

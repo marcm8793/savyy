@@ -17,22 +17,55 @@ export const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
       url: getTRPCUrl(),
-      // Add authentication headers if needed
       async headers() {
-        const headers: Record<string, string> = {};
-
-        // Better Auth automatically handles cookies through the browser
-        // For server-side requests, you might need to forward cookies
+        // Only try to get cookies on server-side during request handling
         if (typeof window === "undefined") {
-          // Server-side: you can add cookie forwarding here if needed
-          // headers.cookie = getServerSideCookies();
+          try {
+            const { cookies } = await import("next/headers");
+            const cookieStore = await cookies();
+            return { cookie: cookieStore.toString() };
+          } catch (error) {
+            // cookies() not available (e.g., during build or in wrong context)
+            console.warn("Could not access cookies:", error);
+            return {};
+          }
         }
-
-        return headers;
+        return {};
+      },
+      fetch(url, options) {
+        return fetch(url, {
+          ...options,
+          credentials: typeof window !== "undefined" ? "include" : "omit",
+        });
       },
     }),
   ],
 });
+
+/**
+ * Create shared tRPC client configuration
+ * This avoids duplication between vanilla client and React client
+ */
+export function createTRPCClientConfig() {
+  return {
+    links: [
+      httpBatchLink({
+        url: getTRPCUrl(),
+        async headers() {
+          // Better Auth automatically handles cookies through the browser
+          // No need to manually set cookies for same-origin requests in browser context
+          return {};
+        },
+        fetch(url, options) {
+          return fetch(url, {
+            ...options,
+            credentials: "include", // This ensures cookies are sent with requests
+          });
+        },
+      }),
+    ],
+  };
+}
 
 /**
  * Export the AppRouter type for use in other files

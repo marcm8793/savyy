@@ -11,13 +11,13 @@ export function ExampleTRPCUsage() {
   // const updateProfileMutation = trpc.auth.updateProfile.useMutation();
 
   return (
-    <div className="p-4 border rounded-lg">
+    <div className="p-4 border rounded-lg dark:bg-gray-800">
       <h2 className="text-xl font-bold mb-4">tRPC Connection Status</h2>
 
       <div className="space-y-4">
         <div>
           <h3 className="font-semibold">Configuration:</h3>
-          <div className="bg-gray-100 p-2 rounded text-sm">
+          <div className="bg-gray-100 p-2 rounded text-sm dark:bg-gray-800">
             <p>
               <strong>tRPC URL:</strong> {config.urls.trpc}
             </p>
@@ -42,7 +42,7 @@ export function ExampleTRPCUsage() {
 
         <div>
           <h3 className="font-semibold">Usage Examples:</h3>
-          <pre className="bg-gray-100 p-2 rounded text-sm overflow-x-auto">
+          <pre className="bg-gray-100 p-2 rounded text-sm overflow-x-auto dark:bg-gray-800">
             {`// Import the trpc hooks
 import { trpc } from "../lib/trpc";
 

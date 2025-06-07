@@ -14,7 +14,7 @@ export function AuthDemo() {
 
   if (isPending) {
     return (
-      <div className="p-6 border rounded-lg">
+      <div className="p-6 border rounded-lg dark:bg-gray-800">
         <div className="flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <span className="ml-2">Loading...</span>
@@ -30,7 +30,7 @@ export function AuthDemo() {
 
   // If not authenticated, show auth forms
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 dark:bg-gray-900">
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-4">Authentication Demo</h1>
         <p className="text-gray-600 mb-6">
@@ -39,7 +39,7 @@ export function AuthDemo() {
 
         {/* Auth Mode Toggle */}
         <div className="flex justify-center mb-6">
-          <div className="bg-gray-100 p-1 rounded-lg">
+          <div className="bg-gray-100 p-1 rounded-lg dark:bg-gray-800">
             <button
               onClick={() => setAuthMode("signin")}
               className={`px-4 py-2 rounded-md transition-colors ${

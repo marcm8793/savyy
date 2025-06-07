@@ -21,7 +21,7 @@ export function UserProfile() {
   const profileQuery = trpc.auth.getProfile.useQuery(
     undefined, // no input needed
     {
-      enabled: session?.user != null,
+      enabled: !!session?.user && !!trpcSessionQuery.data?.isAuthenticated,
     }
   );
 
@@ -83,7 +83,7 @@ export function UserProfile() {
       {/* Better Auth Session Info */}
       <div className="space-y-2">
         <h3 className="text-lg font-semibold">Better Auth Session</h3>
-        <div className="bg-blue-50 p-4 rounded">
+        <div className="bg-blue-50 p-4 rounded dark:bg-gray-800">
           <p>
             <strong>Name:</strong> {session.user.name || "Not set"}
           </p>
@@ -114,7 +114,7 @@ export function UserProfile() {
             tRPC Error: {trpcSessionQuery.error.message}
           </p>
         ) : (
-          <div className="bg-green-50 p-4 rounded">
+          <div className="bg-green-50 p-4 rounded dark:bg-gray-800">
             <p>
               <strong>Authenticated:</strong>{" "}
               {trpcSessionQuery.data?.isAuthenticated ? "Yes" : "No"}
@@ -137,7 +137,7 @@ export function UserProfile() {
       </div>
 
       {/* Profile Information from tRPC */}
-      {session.user && (
+      {session.user && trpcSessionQuery.data?.isAuthenticated && (
         <div className="space-y-2">
           <h3 className="text-lg font-semibold">Profile Information (tRPC)</h3>
           {profileQuery.isPending ? (
@@ -168,7 +168,10 @@ export function UserProfile() {
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={handleUpdateProfile}
-            disabled={updateProfileMutation.isPending}
+            disabled={
+              updateProfileMutation.isPending ||
+              !trpcSessionQuery.data?.isAuthenticated
+            }
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
             {updateProfileMutation.isPending ? "Updating..." : "Update Name"}

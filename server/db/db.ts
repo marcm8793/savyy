@@ -56,5 +56,5 @@ const databasePlugin: FastifyPluginCallback<DatabaseOptions> = (
 // Export the plugin wrapped with fastify-plugin
 export default fp(databasePlugin, {
   name: "database-plugin",
-  fastify: "4.x",
+  fastify: "5.x",
 });

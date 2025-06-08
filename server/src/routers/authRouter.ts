@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
 
-// Shared authentication schemas
+// Auth schemas - these should match the user table constraints
+// email: text().notNull().unique() -> string with email validation
+// name: text().notNull() -> string with minimum length
+// password: not in user table, stored in account table -> string with minimum length
 export const signInSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useSession } from "../../lib/auth-client";
-import { SignInForm } from "../auth/sign-in-form";
-import { SignUpForm } from "../auth/sign-up-form";
+import SignInForm from "../auth/signin-form";
+import SignUpForm from "../auth/signup-form";
 import { UserProfile } from "../auth/user-profile";
 
 type AuthMode = "signin" | "signup";

@@ -7,6 +7,7 @@ import {
   text,
   boolean,
 } from "drizzle-orm/pg-core";
+import { createSelectSchema, createInsertSchema } from "drizzle-zod";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -99,3 +100,41 @@ export const schema = {
   bankAccount,
   transaction,
 };
+
+// Export inferred types from Drizzle schemas
+export type User = typeof user.$inferSelect;
+export type UserInsert = typeof user.$inferInsert;
+
+export type Session = typeof session.$inferSelect;
+export type SessionInsert = typeof session.$inferInsert;
+
+export type Account = typeof account.$inferSelect;
+export type AccountInsert = typeof account.$inferInsert;
+
+export type Verification = typeof verification.$inferSelect;
+export type VerificationInsert = typeof verification.$inferInsert;
+
+export type BankAccount = typeof bankAccount.$inferSelect;
+export type BankAccountInsert = typeof bankAccount.$inferInsert;
+
+export type Transaction = typeof transaction.$inferSelect;
+export type TransactionInsert = typeof transaction.$inferInsert;
+
+// Export Zod schemas for validation
+export const userSelectSchema = createSelectSchema(user);
+export const userInsertSchema = createInsertSchema(user);
+
+export const sessionSelectSchema = createSelectSchema(session);
+export const sessionInsertSchema = createInsertSchema(session);
+
+export const accountSelectSchema = createSelectSchema(account);
+export const accountInsertSchema = createInsertSchema(account);
+
+export const verificationSelectSchema = createSelectSchema(verification);
+export const verificationInsertSchema = createInsertSchema(verification);
+
+export const bankAccountSelectSchema = createSelectSchema(bankAccount);
+export const bankAccountInsertSchema = createInsertSchema(bankAccount);
+
+export const transactionSelectSchema = createSelectSchema(transaction);
+export const transactionInsertSchema = createInsertSchema(transaction);

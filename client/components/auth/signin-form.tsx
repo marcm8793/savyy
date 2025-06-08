@@ -2,7 +2,6 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -18,11 +17,8 @@ import {
 } from "@/components/ui/form";
 import { authClient } from "@/lib/auth-client";
 import Image from "next/image";
-import type { inferRouterInputs } from "@trpc/server";
-import type { AppRouter } from "@/lib/trpc";
-
-// Use the shared schema from tRPC auth router
-type SignInFormData = inferRouterInputs<AppRouter>["auth"]["signIn"];
+import type { SignInFormData } from "@/types";
+import { signInSchema } from "@/types";
 
 export default function SignInForm() {
   const router = useRouter();
@@ -30,13 +26,8 @@ export default function SignInForm() {
   const [error, setError] = useState<string | null>(null);
 
   // Define the validation schema for sign in
-  const signInValidation = z.object({
-    email: z.string().email("Please enter a valid email address"),
-    password: z.string().min(1, "Password is required"),
-  });
-
   const form = useForm<SignInFormData>({
-    resolver: zodResolver(signInValidation),
+    resolver: zodResolver(signInSchema),
     defaultValues: {
       email: "",
       password: "",

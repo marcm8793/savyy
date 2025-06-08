@@ -399,6 +399,23 @@ export class TinkService {
     ).toString("base64");
   }
 
+  // TODO:
+  //   Consider adding expiration validation for state tokens.
+  // While the state token includes a timestamp, there's no validation to ensure the token hasn't expired during the OAuth flow. This could leave the system vulnerable to replay attacks with old state tokens.
+
+  // Consider implementing token expiration:
+
+  // generateStateToken(userId: string): string {
+  //   return Buffer.from(
+  //     JSON.stringify({
+  //       userId,
+  //       timestamp: Date.now(),
+  //       // Add a nonce for additional security
+  //       nonce: crypto.randomBytes(16).toString('hex')
+  //     })
+  //   ).toString("base64");
+  // }
+
   /**
    * Parse state token to extract user ID
    */
@@ -411,6 +428,27 @@ export class TinkService {
       return null;
     }
   }
+
+  // TODO:
+  //   Add timestamp validation when parsing state tokens.
+  // The parseStateToken method should validate that the token hasn't expired to prevent replay attacks.
+
+  // Apply this enhancement to validate token age:
+
+  // parseStateToken(state: string): { userId: string; timestamp: number } | null {
+  //     try {
+  //       const stateData = JSON.parse(Buffer.from(state, "base64").toString());
+  // +
+  // +     // Validate token age (e.g., 10 minutes)
+  // +     const TOKEN_MAX_AGE_MS = 10 * 60 * 1000;
+  // +     if (Date.now() - stateData.timestamp > TOKEN_MAX_AGE_MS) {
+  // +       console.warn("State token expired", {
+  // +         age: Date.now() - stateData.timestamp,
+  // +         maxAge: TOKEN_MAX_AGE_MS
+  // +       });
+  // +       return null;
+  // +     }
+  // +
 
   /**
    * Complete account synchronization flow: exchange code -> fetch accounts -> store in DB

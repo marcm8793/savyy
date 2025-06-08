@@ -87,7 +87,10 @@ export default function AccountsPage() {
 
       // Validate URL before redirect for security
       const url = new URL(result.url);
-      if (!url.hostname.includes("link.tink.com")) {
+      if (
+        url.hostname !== "link.tink.com" &&
+        !url.hostname.endsWith(".link.tink.com")
+      ) {
         throw new Error("Invalid Tink URL domain");
       }
 

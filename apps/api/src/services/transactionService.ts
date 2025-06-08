@@ -1,6 +1,6 @@
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { eq, and } from "drizzle-orm";
-import { schema, transaction } from "../../db/schema";
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { eq, and } from 'drizzle-orm';
+import { schema, transaction } from '../../db/schema';
 
 // Transaction service methods
 export const transactionService = {
@@ -14,7 +14,7 @@ export const transactionService = {
   async getTransactionById(
     db: NodePgDatabase<typeof schema>,
     id: number,
-    userId: string
+    userId: string,
   ) {
     const result = await db
       .select()
@@ -27,7 +27,7 @@ export const transactionService = {
 
   async createTransaction(
     db: NodePgDatabase<typeof schema>,
-    data: typeof transaction.$inferInsert
+    data: typeof transaction.$inferInsert,
   ) {
     const result = await db.insert(transaction).values(data).returning();
 
@@ -38,7 +38,7 @@ export const transactionService = {
     db: NodePgDatabase<typeof schema>,
     id: number,
     data: Partial<typeof transaction.$inferInsert>,
-    userId: string
+    userId: string,
   ) {
     const result = await db
       .update(transaction)
@@ -52,7 +52,7 @@ export const transactionService = {
   async deleteTransaction(
     db: NodePgDatabase<typeof schema>,
     id: number,
-    userId: string
+    userId: string,
   ) {
     await db
       .delete(transaction)

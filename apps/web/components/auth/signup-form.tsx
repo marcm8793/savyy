@@ -20,6 +20,7 @@ import { authClient } from "@/lib/auth-client";
 import Image from "next/image";
 import type { inferRouterInputs } from "@trpc/server";
 import type { AppRouter } from "@/lib/trpc";
+import Link from "next/link";
 
 // Use the shared schema from tRPC auth router
 type SignUpFormData = inferRouterInputs<AppRouter>["auth"]["signUp"];
@@ -168,9 +169,9 @@ export default function SignUpForm() {
 
                 <div className="text-center text-sm">
                   Already have an account?{" "}
-                  <a href="#" className="underline underline-offset-4">
+                  <Link href="/signin" className="underline underline-offset-4">
                     Sign in
-                  </a>
+                  </Link>
                 </div>
               </div>
             </form>

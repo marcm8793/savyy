@@ -1,7 +1,7 @@
-import { router } from "../trpc";
-import { authRouter } from "./authRouter";
-import { transactionRouter } from "./transactionRouter";
-import { accountRouter } from "./accountRouter";
+import { router } from '../trpc';
+import { authRouter } from './authRouter';
+import { transactionRouter } from './transactionRouter';
+import { accountRouter } from './accountRouter';
 
 // Combine all routers using the centralized tRPC setup
 export const appRouter = router({

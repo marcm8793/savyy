@@ -1,5 +1,5 @@
-import { initTRPC, TRPCError } from "@trpc/server";
-import type { Context } from "./context";
+import { initTRPC, TRPCError } from '@trpc/server';
+import type { Context } from './context';
 
 /**
  * Initialization of tRPC backend
@@ -14,8 +14,8 @@ const t = initTRPC.context<Context>().create();
 const isAuthenticated = t.middleware(({ ctx, next }) => {
   if (!ctx.user || !ctx.session) {
     throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "You must be logged in to access this resource",
+      code: 'UNAUTHORIZED',
+      message: 'You must be logged in to access this resource',
     });
   }
 

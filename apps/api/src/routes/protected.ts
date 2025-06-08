@@ -5,6 +5,9 @@ const protectedRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(authMiddleware);
 
   fastify.get("/api/protected/profile", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "User not authenticated" });
+    }
     return {
       message: "This is a protected route",
       user: {
@@ -20,6 +23,9 @@ const protectedRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.get("/api/protected/dashboard", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "User not authenticated" });
+    }
     return {
       message: `Welcome to your dashboard, ${
         request.user?.name || request.user?.email

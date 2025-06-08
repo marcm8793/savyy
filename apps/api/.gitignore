@@ -20,8 +20,8 @@ build/
 
 
 # Drizzle ORM Migrations (generated files)
-backend/drizzle/migrations/*.sql
-backend/drizzle/snapshots/
+drizzle/migrations/*.sql
+drizzle/snapshots/
 
 # Logs
 logs/
@@ -43,4 +43,4 @@ coverage/
 *.lcov
 
 # Production Build Artifacts
-/backend/dist/
+/dist/

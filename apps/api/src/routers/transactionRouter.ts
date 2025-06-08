@@ -16,7 +16,7 @@ const createTransactionSchema = z.object({
   accountId: z.number(),
   amount: z.number(),
   date: z.date(),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
 });
 
 const updateTransactionSchema = z.object({
@@ -64,6 +64,7 @@ export const transactionRouter = router({
       return await transactionService.createTransaction(ctx.db, {
         ...input,
         userId: ctx.user.id, // Use authenticated user's ID
+        bankAccountId: input.accountId,
       });
     }),
 

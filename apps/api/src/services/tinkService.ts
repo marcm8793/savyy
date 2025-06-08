@@ -312,7 +312,7 @@ export class TinkService {
           .from(bankAccount)
           .where(
             and(
-              eq(bankAccount.tinkAccountId, accountData.tinkAccountId!),
+              eq(bankAccount.tinkAccountId, accountData.tinkAccountId),
               eq(bankAccount.userId, userId)
             )
           )
@@ -326,6 +326,7 @@ export class TinkService {
             .set({
               ...accountData,
               updatedAt: new Date(),
+              balance: accountData.balance.toString(),
             })
             .where(eq(bankAccount.id, existing[0].id))
             .returning();
@@ -334,9 +335,13 @@ export class TinkService {
         } else {
           console.log("Inserting new account");
           // Insert new account
+          // Insert new account
           const inserted = await db
             .insert(bankAccount)
-            .values(accountData)
+            .values({
+              ...accountData,
+              balance: accountData.balance.toString(),
+            })
             .returning();
           results.push(inserted[0]);
           console.log("Account inserted successfully:", inserted[0].id);
@@ -415,6 +420,22 @@ export class TinkService {
   //     })
   //   ).toString("base64");
   // }
+  //   Unsigned state token – easy to forge
+  // generateStateToken merely base64-encodes JSON, offering no authenticity guarantees.
+  // Add an HMAC or switch to JWT:
+
+  // +import crypto from "node:crypto";
+  //  ...
+  //  generateStateToken(userId: string): string {
+  // -  return Buffer.from(JSON.stringify({ userId, timestamp: Date.now() })).toString("base64");
+  // +  const payload = JSON.stringify({ userId, timestamp: Date.now() });
+  // +  const sig = crypto
+  // +    .createHmac("sha256", process.env.TINK_STATE_SECRET!)
+  // +    .update(payload)
+  // +    .digest("base64url");
+  // +  return Buffer.from(`${payload}.${sig}`).toString("base64url");
+  //  }
+  // Validate the signature in parseStateToken.
 
   /**
    * Parse state token to extract user ID

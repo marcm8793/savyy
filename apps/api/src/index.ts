@@ -1,5 +1,5 @@
-import "dotenv/config";
-import { createApp } from "./app";
+import 'dotenv/config';
+import { createApp } from './app';
 
 const PORT = Number(process.env.PORT) || 8080;
 
@@ -15,6 +15,6 @@ createApp()
     });
   })
   .catch((err) => {
-    console.error("Failed to start server:", err);
+    console.error('Failed to start server:', err);
     process.exit(1);
   });

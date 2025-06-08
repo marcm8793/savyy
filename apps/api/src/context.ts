@@ -1,7 +1,7 @@
-import { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify";
-import { auth } from "./utils/auth";
-import { FastifyRequest } from "fastify";
-import { Session } from "better-auth";
+import { CreateFastifyContextOptions } from '@trpc/server/adapters/fastify';
+import { auth } from './utils/auth';
+import { FastifyRequest } from 'fastify';
+import { Session } from 'better-auth';
 
 /**
  * Creates context for an incoming request
@@ -18,8 +18,8 @@ export async function createContext({ req, res }: CreateFastifyContextOptions) {
     });
   } catch (error) {
     // Log the error but don't throw - allow the request to continue without auth
-    console.error("Error getting session in tRPC context:", error);
-    console.error("Request headers:", req.headers);
+    console.error('Error getting session in tRPC context:', error);
+    console.error('Request headers:', req.headers);
   }
 
   return {

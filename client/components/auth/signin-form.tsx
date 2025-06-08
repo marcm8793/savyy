@@ -18,7 +18,13 @@ import {
 import { authClient } from "@/lib/auth-client";
 import Image from "next/image";
 import type { SignInFormData } from "@/types";
-import { signInSchema } from "@/types";
+import Link from "next/link";
+import { z } from "zod";
+
+const signInSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
 
 export default function SignInForm() {
   const router = useRouter();
@@ -135,9 +141,9 @@ export default function SignInForm() {
 
                 <div className="text-center text-sm">
                   Don&apos;t have an account?{" "}
-                  <a href="#" className="underline underline-offset-4">
+                  <Link href="/signup" className="underline underline-offset-4">
                     Sign up
-                  </a>
+                  </Link>
                 </div>
               </div>
             </form>

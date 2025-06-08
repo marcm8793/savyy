@@ -37,9 +37,20 @@ export type DeleteTransactionOutput =
 // Account-related types (from server account router)
 export type GetAccountsInput = RouterInputs["account"]["getAccounts"];
 export type CreateAccountInput = RouterInputs["account"]["createAccount"];
+export type GetTinkConnectionUrlInput =
+  RouterInputs["account"]["getTinkConnectionUrl"];
+export type GetTinkConnectionUrlSecureInput =
+  RouterInputs["account"]["getTinkConnectionUrlSecure"];
+export type SyncTinkAccountsInput = RouterInputs["account"]["syncTinkAccounts"];
 
 export type AccountsOutput = RouterOutputs["account"]["getAccounts"];
 export type CreateAccountOutput = RouterOutputs["account"]["createAccount"];
+export type TinkConnectionUrlOutput =
+  RouterOutputs["account"]["getTinkConnectionUrl"];
+export type TinkConnectionUrlSecureOutput =
+  RouterOutputs["account"]["getTinkConnectionUrlSecure"];
+export type SyncTinkAccountsOutput =
+  RouterOutputs["account"]["syncTinkAccounts"];
 
 // Form types for client components (using tRPC input types)
 export type SignInFormData = SignInInput;

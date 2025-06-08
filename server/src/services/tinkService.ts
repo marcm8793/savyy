@@ -1,0 +1,414 @@
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { eq } from "drizzle-orm";
+import { bankAccount } from "../../db/schema";
+
+interface TinkTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  token_type: string;
+  scope: string;
+}
+
+interface TinkAccount {
+  id: string;
+  name: string;
+  type: string;
+  balances?: {
+    booked?: {
+      amount: {
+        currencyCode: string;
+        value: {
+          scale: string;
+          unscaledValue: string;
+        };
+      };
+    };
+    available?: {
+      amount: {
+        currencyCode: string;
+        value: {
+          scale: string;
+          unscaledValue: string;
+        };
+      };
+    };
+  };
+  customerSegment?: string;
+  dates?: {
+    lastRefreshed: string;
+  };
+  financialInstitutionId?: string;
+  identifiers?: {
+    iban?: {
+      bban: string;
+      iban: string;
+    };
+    pan?: {
+      masked: string;
+    };
+  };
+}
+
+interface TinkAccountsResponse {
+  accounts: TinkAccount[];
+}
+
+export class TinkService {
+  private readonly clientId: string;
+  private readonly clientSecret: string;
+  private readonly redirectUri: string;
+  private readonly baseUrl: string;
+
+  constructor() {
+    this.clientId = process.env.TINK_CLIENT_ID!;
+    this.clientSecret = process.env.TINK_CLIENT_SECRET!;
+    this.redirectUri = process.env.TINK_REDIRECT_URI!;
+    this.baseUrl = process.env.TINK_API_URL || "https://api.tink.com";
+
+    console.log("Tink Service Configuration:", {
+      clientId: this.clientId
+        ? `${this.clientId.substring(0, 8)}...`
+        : "MISSING",
+      clientSecret: this.clientSecret ? "SET" : "MISSING",
+      redirectUri: this.redirectUri,
+      baseUrl: this.baseUrl,
+    });
+
+    if (!this.clientId || !this.clientSecret || !this.redirectUri) {
+      throw new Error(
+        `Missing required Tink environment variables: clientId=${!!this
+          .clientId}, clientSecret=${!!this.clientSecret}, redirectUri=${!!this
+          .redirectUri}`
+      );
+    }
+  }
+
+  /**
+   * Exchange authorization code for access token
+   */
+  async exchangeCodeForToken(code: string): Promise<TinkTokenResponse> {
+    const requestBody = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: this.redirectUri,
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+    });
+
+    console.log("Tink token exchange request:", {
+      url: `${this.baseUrl}/api/v1/oauth/token`,
+      clientId: this.clientId
+        ? `${this.clientId.substring(0, 8)}...`
+        : "MISSING",
+      redirectUri: this.redirectUri,
+      code: code ? `${code.substring(0, 8)}...` : "MISSING",
+    });
+
+    const response = await fetch(`${this.baseUrl}/api/v1/oauth/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: requestBody,
+    });
+
+    console.log("Tink token exchange response:", {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Tink token exchange error:", errorText);
+      throw new Error(
+        `Failed to exchange code for token: ${response.status} ${errorText}`
+      );
+    }
+
+    const tokenData = await response.json();
+    console.log("Tink token exchange success:", {
+      hasAccessToken: !!tokenData.access_token,
+      tokenType: tokenData.token_type,
+      expiresIn: tokenData.expires_in,
+      scope: tokenData.scope,
+    });
+
+    // Log the actual token for debugging (first 50 chars only for security)
+    console.log("OAuth token details:", {
+      accessTokenPreview: tokenData.access_token?.substring(0, 50) + "...",
+      refreshToken: !!tokenData.refresh_token,
+      fullScope: tokenData.scope,
+    });
+
+    return tokenData;
+  }
+
+  /**
+   * Fetch accounts from Tink API
+   */
+  async fetchAccounts(accessToken: string): Promise<TinkAccount[]> {
+    console.log("Fetching accounts from Tink API...");
+
+    const response = await fetch(`${this.baseUrl}/data/v2/accounts`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("Tink accounts API response:", {
+      status: response.status,
+      statusText: response.statusText,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Failed to fetch accounts from Tink:", errorText);
+      throw new Error(
+        `Failed to fetch accounts: ${response.status} ${errorText}`
+      );
+    }
+
+    const data: TinkAccountsResponse = await response.json();
+
+    // Log the full response to understand the data structure
+    console.log("Full Tink accounts response:", JSON.stringify(data, null, 2));
+
+    console.log("Fetched accounts from Tink:", {
+      accountCount: data.accounts?.length || 0,
+      accounts:
+        data.accounts?.map((acc) => ({
+          id: acc.id,
+          name: acc.name,
+          balances: acc.balances,
+          type: acc.type,
+          identifiers: acc.identifiers,
+        })) || [],
+    });
+
+    return data.accounts || [];
+  }
+
+  /**
+   * Refresh access token using refresh token
+   */
+  async refreshToken(refreshToken: string): Promise<TinkTokenResponse> {
+    const response = await fetch(`${this.baseUrl}/api/v1/oauth/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to refresh token: ${response.status} ${errorText}`
+      );
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Store Tink accounts in database
+   */
+  async storeAccounts(
+    db: NodePgDatabase<any>,
+    userId: string,
+    accounts: TinkAccount[],
+    accessToken: string,
+    tokenScope?: string,
+    expiresIn?: number
+  ) {
+    console.log("storeAccounts called with:", {
+      userId,
+      accountCount: accounts.length,
+      accounts: accounts.map((acc) => ({
+        id: acc.id,
+        name: acc.name,
+        balances: acc.balances,
+      })),
+    });
+
+    const expiresAt = expiresIn
+      ? new Date(Date.now() + expiresIn * 1000)
+      : new Date(Date.now() + 3600 * 1000); // Default 1 hour
+
+    const accountsToInsert = accounts.map((account) => {
+      // Extract balance from Tink's nested balance structure
+      let balanceValue: number | null = null;
+      let currency = "EUR"; // Default currency
+
+      // Try to get booked balance first, then available balance
+      const bookedBalance = account.balances?.booked;
+      const availableBalance = account.balances?.available;
+
+      if (bookedBalance) {
+        const unscaledValue = parseInt(
+          bookedBalance.amount.value.unscaledValue
+        );
+        const scale = parseInt(bookedBalance.amount.value.scale);
+        // Scale represents decimal places: unscaledValue * 10^(-scale)
+        balanceValue = unscaledValue * Math.pow(10, -scale);
+        currency = bookedBalance.amount.currencyCode;
+
+        console.log(`Booked balance conversion for ${account.name}:`, {
+          unscaledValue: bookedBalance.amount.value.unscaledValue,
+          scale: bookedBalance.amount.value.scale,
+          parsedUnscaled: unscaledValue,
+          parsedScale: scale,
+          multiplier: Math.pow(10, -scale),
+          finalBalance: balanceValue,
+          currency,
+        });
+      } else if (availableBalance) {
+        const unscaledValue = parseInt(
+          availableBalance.amount.value.unscaledValue
+        );
+        const scale = parseInt(availableBalance.amount.value.scale);
+        // Scale represents decimal places: unscaledValue * 10^(-scale)
+        balanceValue = unscaledValue * Math.pow(10, -scale);
+        currency = availableBalance.amount.currencyCode;
+
+        console.log(`Available balance conversion for ${account.name}:`, {
+          unscaledValue: availableBalance.amount.value.unscaledValue,
+          scale: availableBalance.amount.value.scale,
+          parsedUnscaled: unscaledValue,
+          parsedScale: scale,
+          multiplier: Math.pow(10, -scale),
+          finalBalance: balanceValue,
+          currency,
+        });
+      }
+
+      console.log(`Processing account ${account.name}:`, {
+        bookedBalance: bookedBalance
+          ? {
+              unscaledValue: bookedBalance.amount.value.unscaledValue,
+              scale: bookedBalance.amount.value.scale,
+              currency: bookedBalance.amount.currencyCode,
+            }
+          : null,
+        availableBalance: availableBalance
+          ? {
+              unscaledValue: availableBalance.amount.value.unscaledValue,
+              scale: availableBalance.amount.value.scale,
+              currency: availableBalance.amount.currencyCode,
+            }
+          : null,
+        extractedBalance: balanceValue,
+        currency,
+      });
+
+      return {
+        userId,
+        tinkAccountId: account.id,
+        accountName: account.name,
+        accountType: account.type,
+        financialInstitutionId: account.financialInstitutionId,
+        balance: balanceValue != null ? Math.round(balanceValue * 100) : 0, // Convert to cents, default to 0 if undefined
+        currency,
+        iban: account.identifiers?.iban?.iban,
+        lastRefreshed: account.dates?.lastRefreshed
+          ? new Date(account.dates.lastRefreshed)
+          : null,
+        accessToken: accessToken,
+        tokenExpiresAt: expiresAt,
+        tokenScope: tokenScope,
+      };
+    });
+
+    console.log("Accounts to insert:", accountsToInsert);
+
+    // Insert accounts, handling duplicates by updating existing ones
+    const results = [];
+    for (const accountData of accountsToInsert) {
+      try {
+        console.log("Processing account:", accountData.accountName);
+
+        const existing = await db
+          .select()
+          .from(bankAccount)
+          .where(eq(bankAccount.tinkAccountId, accountData.tinkAccountId!))
+          .limit(1);
+
+        if (existing.length > 0) {
+          console.log("Updating existing account:", existing[0].id);
+          // Update existing account
+          const updated = await db
+            .update(bankAccount)
+            .set({
+              ...accountData,
+              updatedAt: new Date(),
+            })
+            .where(eq(bankAccount.id, existing[0].id))
+            .returning();
+          results.push(updated[0]);
+          console.log("Account updated successfully");
+        } else {
+          console.log("Inserting new account");
+          // Insert new account
+          const inserted = await db
+            .insert(bankAccount)
+            .values(accountData)
+            .returning();
+          results.push(inserted[0]);
+          console.log("Account inserted successfully:", inserted[0].id);
+        }
+      } catch (error) {
+        console.error("Error storing account:", accountData.accountName, error);
+        throw error;
+      }
+    }
+
+    console.log("storeAccounts completed, stored:", results.length, "accounts");
+    return results;
+  }
+
+  /**
+   * Get Tink connection URL for user
+   */
+  getTinkConnectionUrl(
+    market: string = "FR",
+    locale: string = "en_US"
+  ): string {
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      market,
+      locale,
+    });
+
+    return `https://link.tink.com/1.0/transactions/connect-accounts/?${params.toString()}`;
+  }
+
+  /**
+   * Get Tink connection URL with state parameter for user identification
+   */
+  getTinkConnectionUrlWithState(
+    market: string = "FR",
+    locale: string = "en_US",
+    state: string
+  ): string {
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      market,
+      locale,
+      state,
+    });
+
+    return `https://link.tink.com/1.0/transactions/connect-accounts/?${params.toString()}`;
+  }
+}
+
+export const tinkService = new TinkService();

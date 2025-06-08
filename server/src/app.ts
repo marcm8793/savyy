@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth";
 import healthRoutes from "./routes/health";
 import protectedRoutes from "./routes/protected";
 import publicRoutes from "./routes/public";
+import tinkRoutes from "./routes/tink";
 
 export async function createApp() {
   const fastify = Fastify({
@@ -26,6 +27,7 @@ export async function createApp() {
   await fastify.register(healthRoutes);
   await fastify.register(protectedRoutes);
   await fastify.register(publicRoutes);
+  await fastify.register(tinkRoutes);
 
   return fastify;
 }

@@ -69,14 +69,31 @@ export const verification = pgTable("verification", {
   ),
 });
 
-// Define bank account schema for Drizzle ORM
+// Define bank account schema for Drizzle ORM (based on actual Tink API response)
 export const bankAccount = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  accountName: varchar("account_name", { length: 255 }).notNull(),
-  bankId: varchar("bank_id", { length: 255 }).notNull(),
+  // From Tink API /data/v2/accounts
+  tinkAccountId: varchar("tink_account_id", { length: 255 }).notNull().unique(), // id from API
+  accountName: varchar("account_name", { length: 255 }).notNull(), // name from API
+  accountType: varchar("account_type", { length: 100 }), // type from API (CHECKING, SAVINGS, etc.)
+  financialInstitutionId: varchar("financial_institution_id", { length: 255 }), // financialInstitutionId from API
+  balance: integer("balance"), // Store balance in cents (from balances.booked.amount)
+  currency: varchar("currency", { length: 3 }).default("EUR"), // from balances.booked.amount.currencyCode
+  iban: varchar("iban", { length: 34 }), // from identifiers.iban.iban
+  lastRefreshed: timestamp("last_refreshed"), // from dates.lastRefreshed
+  // OAuth token info (from /api/v1/oauth/token)
+  accessToken: text("access_token"), // access_token from OAuth response
+  tokenExpiresAt: timestamp("token_expires_at"), // calculated from expires_in
+  tokenScope: varchar("token_scope", { length: 255 }), // scope from OAuth response
+  createdAt: timestamp("created_at")
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: timestamp("updated_at")
+    .$defaultFn(() => new Date())
+    .notNull(),
 });
 
 // Define transaction schema for Drizzle ORM

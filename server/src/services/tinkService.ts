@@ -1,6 +1,6 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { eq } from "drizzle-orm";
-import { bankAccount } from "../../db/schema";
+import { and, eq } from "drizzle-orm";
+import { BankAccount, bankAccount, schema } from "../../db/schema";
 
 interface TinkTokenResponse {
   access_token: string;
@@ -66,15 +66,6 @@ export class TinkService {
     this.redirectUri = process.env.TINK_REDIRECT_URI!;
     this.baseUrl = process.env.TINK_API_URL || "https://api.tink.com";
 
-    console.log("Tink Service Configuration:", {
-      clientId: this.clientId
-        ? `${this.clientId.substring(0, 8)}...`
-        : "MISSING",
-      clientSecret: this.clientSecret ? "SET" : "MISSING",
-      redirectUri: this.redirectUri,
-      baseUrl: this.baseUrl,
-    });
-
     if (!this.clientId || !this.clientSecret || !this.redirectUri) {
       throw new Error(
         `Missing required Tink environment variables: clientId=${!!this
@@ -94,15 +85,6 @@ export class TinkService {
       redirect_uri: this.redirectUri,
       client_id: this.clientId,
       client_secret: this.clientSecret,
-    });
-
-    console.log("Tink token exchange request:", {
-      url: `${this.baseUrl}/api/v1/oauth/token`,
-      clientId: this.clientId
-        ? `${this.clientId.substring(0, 8)}...`
-        : "MISSING",
-      redirectUri: this.redirectUri,
-      code: code ? `${code.substring(0, 8)}...` : "MISSING",
     });
 
     const response = await fetch(`${this.baseUrl}/api/v1/oauth/token`, {
@@ -135,13 +117,6 @@ export class TinkService {
       scope: tokenData.scope,
     });
 
-    // Log the actual token for debugging (first 50 chars only for security)
-    console.log("OAuth token details:", {
-      accessTokenPreview: tokenData.access_token?.substring(0, 50) + "...",
-      refreshToken: !!tokenData.refresh_token,
-      fullScope: tokenData.scope,
-    });
-
     return tokenData;
   }
 
@@ -172,9 +147,6 @@ export class TinkService {
     }
 
     const data: TinkAccountsResponse = await response.json();
-
-    // Log the full response to understand the data structure
-    console.log("Full Tink accounts response:", JSON.stringify(data, null, 2));
 
     console.log("Fetched accounts from Tink:", {
       accountCount: data.accounts?.length || 0,
@@ -338,7 +310,12 @@ export class TinkService {
         const existing = await db
           .select()
           .from(bankAccount)
-          .where(eq(bankAccount.tinkAccountId, accountData.tinkAccountId!))
+          .where(
+            and(
+              eq(bankAccount.tinkAccountId, accountData.tinkAccountId!),
+              eq(bankAccount.userId, userId)
+            )
+          )
           .limit(1);
 
         if (existing.length > 0) {
@@ -408,6 +385,61 @@ export class TinkService {
     });
 
     return `https://link.tink.com/1.0/transactions/connect-accounts/?${params.toString()}`;
+  }
+
+  /**
+   * Generate state token for OAuth flow with user identification
+   */
+  generateStateToken(userId: string): string {
+    return Buffer.from(
+      JSON.stringify({
+        userId,
+        timestamp: Date.now(),
+      })
+    ).toString("base64");
+  }
+
+  /**
+   * Parse state token to extract user ID
+   */
+  parseStateToken(state: string): { userId: string; timestamp: number } | null {
+    try {
+      const stateData = JSON.parse(Buffer.from(state, "base64").toString());
+      return stateData;
+    } catch (error) {
+      console.warn("Failed to decode state parameter:", { state, error });
+      return null;
+    }
+  }
+
+  /**
+   * Complete account synchronization flow: exchange code -> fetch accounts -> store in DB
+   */
+  async syncUserAccounts(
+    db: NodePgDatabase<typeof schema>,
+    userId: string,
+    code: string
+  ): Promise<{ accounts: BankAccount[]; count: number }> {
+    // Exchange code for token
+    const tokenResponse = await this.exchangeCodeForToken(code);
+
+    // Fetch accounts from Tink
+    const tinkAccounts = await this.fetchAccounts(tokenResponse.access_token);
+
+    // Store accounts in database
+    const storedAccounts = await this.storeAccounts(
+      db,
+      userId,
+      tinkAccounts,
+      tokenResponse.access_token,
+      tokenResponse.scope,
+      tokenResponse.expires_in
+    );
+
+    return {
+      accounts: storedAccounts,
+      count: storedAccounts.length,
+    };
   }
 }
 

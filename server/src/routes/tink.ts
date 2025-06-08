@@ -23,56 +23,37 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: "Missing authorization code" });
       }
 
-      fastify.log.info("Attempting to exchange code for token", { code });
-
-      // Exchange code for access token
-      const tokenResponse = await tinkService.exchangeCodeForToken(code);
-
-      fastify.log.info("Successfully exchanged code for token", {
-        hasAccessToken: !!tokenResponse.access_token,
-        expiresIn: tokenResponse.expires_in,
-      });
-
-      // Handle state parameter to get user ID
-      let userId: string | null = null;
+      // Handle state parameter to get user ID and sync accounts
       if (state) {
-        try {
-          const stateData = JSON.parse(Buffer.from(state, "base64").toString());
-          userId = stateData.userId;
-          fastify.log.info("Decoded state parameter", { userId });
-        } catch (error) {
-          fastify.log.warn("Failed to decode state parameter", { state });
-        }
-      }
-
-      // If we have a user ID, sync accounts automatically
-      if (userId) {
-        try {
-          // Fetch accounts from Tink
-          const tinkAccounts = await tinkService.fetchAccounts(
-            tokenResponse.access_token
-          );
-
-          // Store accounts in database
-          const storedAccounts = await tinkService.storeAccounts(
-            fastify.db,
-            userId,
-            tinkAccounts,
-            tokenResponse.access_token,
-            tokenResponse.scope,
-            tokenResponse.expires_in
-          );
-
-          fastify.log.info("Accounts synced successfully", {
-            userId,
-            accountCount: storedAccounts.length,
+        const stateData = tinkService.parseStateToken(state);
+        if (stateData?.userId) {
+          fastify.log.info("Decoded state parameter", {
+            userId: stateData.userId,
           });
-        } catch (syncError) {
-          fastify.log.error("Failed to sync accounts", {
-            userId,
-            error: syncError,
-          });
+
+          try {
+            const syncResult = await tinkService.syncUserAccounts(
+              fastify.db,
+              stateData.userId,
+              code
+            );
+
+            fastify.log.info("Accounts synced successfully", {
+              userId: stateData.userId,
+              accountCount: syncResult.count,
+            });
+          } catch (syncError) {
+            fastify.log.error("Failed to sync accounts", {
+              userId: stateData.userId,
+              error: syncError,
+            });
+          }
         }
+      } else {
+        // If no state parameter, just exchange the code to validate it
+        fastify.log.info("No state parameter, validating code");
+        await tinkService.exchangeCodeForToken(code);
+        fastify.log.info("Code validation successful");
       }
 
       const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
@@ -123,12 +104,7 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         // Generate state parameter with user ID for security
-        const state = Buffer.from(
-          JSON.stringify({
-            userId: user.id,
-            timestamp: Date.now(),
-          })
-        ).toString("base64");
+        const state = tinkService.generateStateToken(user.id);
 
         const connectionUrl = tinkService.getTinkConnectionUrlWithState(
           market,
@@ -169,28 +145,17 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.status(401).send({ error: "User not authenticated" });
         }
 
-        // Exchange code for token
-        const tokenResponse = await tinkService.exchangeCodeForToken(code);
-
-        // Fetch accounts from Tink
-        const tinkAccounts = await tinkService.fetchAccounts(
-          tokenResponse.access_token
-        );
-
-        // Store accounts in database
-        const storedAccounts = await tinkService.storeAccounts(
+        // Sync user accounts using the consolidated method
+        const syncResult = await tinkService.syncUserAccounts(
           fastify.db,
           user.id,
-          tinkAccounts,
-          tokenResponse.access_token,
-          tokenResponse.scope,
-          tokenResponse.expires_in
+          code
         );
 
         return reply.send({
           message: "Accounts synchronized successfully",
-          accounts: storedAccounts,
-          count: storedAccounts.length,
+          accounts: syncResult.accounts,
+          count: syncResult.count,
         });
       } catch (error) {
         fastify.log.error("Error syncing Tink accounts:", error);

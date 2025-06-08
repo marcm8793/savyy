@@ -103,12 +103,7 @@ export const accountRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       // Generate state parameter with user ID for security
-      const state = Buffer.from(
-        JSON.stringify({
-          userId: ctx.user.id,
-          timestamp: Date.now(),
-        })
-      ).toString("base64");
+      const state = tinkService.generateStateToken(ctx.user.id);
 
       const connectionUrl = tinkService.getTinkConnectionUrlWithState(
         input.market,
@@ -136,28 +131,17 @@ export const accountRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Exchange code for token
-      const tokenResponse = await tinkService.exchangeCodeForToken(input.code);
-
-      // Fetch accounts from Tink
-      const tinkAccounts = await tinkService.fetchAccounts(
-        tokenResponse.access_token
-      );
-
-      // Store accounts in database
-      const storedAccounts = await tinkService.storeAccounts(
+      // Sync user accounts using the consolidated method
+      const syncResult = await tinkService.syncUserAccounts(
         ctx.db,
         ctx.user.id,
-        tinkAccounts,
-        tokenResponse.access_token,
-        tokenResponse.scope,
-        tokenResponse.expires_in
+        input.code
       );
 
       return {
         message: "Accounts synchronized successfully",
-        accounts: storedAccounts,
-        count: storedAccounts.length,
+        accounts: syncResult.accounts,
+        count: syncResult.count,
       };
     }),
 });

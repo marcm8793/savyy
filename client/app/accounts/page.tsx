@@ -85,6 +85,12 @@ export default function AccountsPage() {
         locale: "en_US",
       });
 
+      // Validate URL before redirect for security
+      const url = new URL(result.url);
+      if (!url.hostname.includes("link.tink.com")) {
+        throw new Error("Invalid Tink URL domain");
+      }
+
       // Redirect to Tink with the secure URL
       window.location.href = result.url;
     } catch (error) {
@@ -192,7 +198,7 @@ export default function AccountsPage() {
                 <CardDescription>
                   {account.iban
                     ? `IBAN: ${account.iban}`
-                    : `ID: ${account.bankId}`}
+                    : `ID: ${account.tinkAccountId}`}
                 </CardDescription>
               </CardHeader>
               <CardContent>

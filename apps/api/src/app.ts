@@ -1,12 +1,12 @@
-import Fastify from 'fastify';
-import databasePlugin from '../db/db';
-import corsPlugin from './plugins/cors';
-import trpcPlugin from './plugins/trpc';
-import authRoutes from './routes/auth';
-import healthRoutes from './routes/health';
-import protectedRoutes from './routes/protected';
-import publicRoutes from './routes/public';
-import tinkRoutes from './routes/tink';
+import Fastify from "fastify";
+import databasePlugin from "../db/db";
+import corsPlugin from "./plugins/cors";
+import trpcPlugin from "./plugins/trpc";
+import authRoutes from "./routes/auth";
+import healthRoutes from "./routes/health";
+import protectedRoutes from "./routes/protected";
+import publicRoutes from "./routes/public";
+import tinkRoutes from "./routes/tink";
 
 export async function createApp() {
   const fastify = Fastify({
@@ -25,7 +25,7 @@ export async function createApp() {
       await fastify.register(corsPlugin);
       await fastify.register(trpcPlugin);
     } catch (error) {
-      fastify.log.error('Failed to register plugins:', error);
+      fastify.log.error("Failed to register plugins:", error);
       throw error;
     }
 
@@ -37,13 +37,13 @@ export async function createApp() {
       await fastify.register(publicRoutes);
       await fastify.register(tinkRoutes);
     } catch (error) {
-      fastify.log.error('Failed to register routes:', error);
+      fastify.log.error("Failed to register routes:", error);
       throw error;
     }
 
     return fastify;
   } catch (error) {
     fastify.log.error(error);
-    process.exit(1);
+    throw error;
   }
 }

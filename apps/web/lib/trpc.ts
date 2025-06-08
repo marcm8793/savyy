@@ -1,6 +1,6 @@
 import { createTRPCReact } from "@trpc/react-query";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import type { AppRouter } from "../../server/src/routers";
+import type { AppRouter } from "../../api/src/routers";
 import { getTRPCUrl } from "./config";
 
 /**
@@ -70,4 +70,4 @@ export function createTRPCClientConfig() {
 /**
  * Export the AppRouter type for use in other files
  */
-export type { AppRouter } from "../../server/src/routers";
+export type { AppRouter } from "../../api/src/routers";

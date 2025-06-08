@@ -30,3 +30,6 @@ package-lock.json
 dist/
 build/
 *.tsbuildinfo
+
+# Turborepo
+.turbo/

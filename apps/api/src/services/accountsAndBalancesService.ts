@@ -1,5 +1,5 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { BankAccount, bankAccount, schema } from "../../db/schema";
 
 // Types based on Tink API documentation
@@ -274,16 +274,21 @@ export class AccountsAndBalancesService {
       tokenScope: tokenScope || "balances:read accounts:read",
     }));
 
-    // Store accounts in database (similar to TinkService.storeAccounts)
+    // Store accounts in database using transaction for atomicity
     const storedAccounts: BankAccount[] = [];
 
-    for (const accountData of accountsToStore) {
-      try {
-        // Check if account already exists
-        const existing = await db
+    await db.transaction(async (trx) => {
+      for (const accountData of accountsToStore) {
+        // Check if account already exists for this user
+        const existing = await trx
           .select()
           .from(bankAccount)
-          .where(eq(bankAccount.tinkAccountId, accountData.tinkAccountId))
+          .where(
+            and(
+              eq(bankAccount.tinkAccountId, accountData.tinkAccountId),
+              eq(bankAccount.userId, userId)
+            )
+          )
           .limit(1);
 
         let result: BankAccount;
@@ -295,7 +300,7 @@ export class AccountsAndBalancesService {
             ? new Date(Date.now() + expiresIn * 1000)
             : existing[0].tokenExpiresAt; // Preserve existing expiration
 
-          const updated = await db
+          const updated = await trx
             .update(bankAccount)
             .set({
               ...accountData,
@@ -316,7 +321,7 @@ export class AccountsAndBalancesService {
             ? new Date(Date.now() + expiresIn * 1000)
             : new Date(Date.now() + 3600 * 1000); // Default 1 hour for new accounts
 
-          const inserted = await db
+          const inserted = await trx
             .insert(bankAccount)
             .values({
               ...accountData,
@@ -329,11 +334,8 @@ export class AccountsAndBalancesService {
         }
 
         storedAccounts.push(result);
-      } catch (error) {
-        console.error("Error storing account:", accountData.accountName, error);
-        throw error;
       }
-    }
+    });
 
     console.log("Sync completed:", {
       userId,

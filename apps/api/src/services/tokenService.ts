@@ -32,10 +32,11 @@ export class TokenService {
         whereConditions.push(eq(bankAccount.tinkAccountId, tinkAccountId));
       }
 
-      const accounts = await db
-        .select()
-        .from(bankAccount)
-        .where(and(...whereConditions))
+      const query = db.select().from(bankAccount);
+      const accounts = await (whereConditions.length === 1
+        ? query.where(whereConditions[0]) // single-predicate path
+        : query.where(and(...whereConditions))
+      ) // multi-predicate path
         .limit(1);
 
       if (accounts.length === 0) {
@@ -52,7 +53,13 @@ export class TokenService {
           reason: "No access token found for account",
         };
       }
-
+      if (!account.tokenExpiresAt) {
+        return {
+          isValid: false,
+          account,
+          reason: "No token expiration date found for account",
+        };
+      }
       // Check if token is expired or will expire soon
       if (
         account.tokenExpiresAt &&

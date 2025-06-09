@@ -78,13 +78,14 @@ export class TinkService {
   private readonly clientSecret: string;
   private readonly redirectUri: string;
   private readonly baseUrl: string;
+  private readonly actorClientId: string;
 
   constructor() {
     this.clientId = process.env.TINK_CLIENT_ID!;
     this.clientSecret = process.env.TINK_CLIENT_SECRET!;
     this.redirectUri = process.env.TINK_REDIRECT_URI!;
     this.baseUrl = process.env.TINK_API_URL || "https://api.tink.com";
-
+    this.actorClientId = process.env.TINK_ACTOR_CLIENT_ID!;
     if (!this.clientId || !this.clientSecret || !this.redirectUri) {
       throw new Error(
         `Missing required Tink environment variables: clientId=${!!this
@@ -262,7 +263,7 @@ export class TinkService {
       "authorization:read,authorization:grant,credentials:refresh,credentials:read,credentials:write,providers:read,user:read";
 
     const requestBody = new URLSearchParams({
-      actor_client_id: "df05e4b379934cd09963197cc855bfe9", // Fixed value from Tink
+      actor_client_id: this.actorClientId,
       scope: options.scope || defaultScope,
     });
 

@@ -97,19 +97,71 @@ export const bankAccount = pgTable("bank_accounts", {
     .notNull(),
 });
 
-// Define transaction schema for Drizzle ORM
+// Define transaction schema for Drizzle ORM (based on Tink API v2/transactions)
 export const transaction = pgTable("transactions", {
   id: serial("id").primaryKey(),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  accountId: integer("account_id").notNull(),
-  amount: integer("amount").notNull(),
-  date: timestamp("date").notNull(),
-  description: varchar("description", { length: 255 }),
+
+  // Core Tink API fields
+  tinkTransactionId: varchar("tink_transaction_id", { length: 255 })
+    .notNull()
+    .unique(), // id from Tink API
+  tinkAccountId: varchar("tink_account_id", { length: 255 }).notNull(), // accountId from Tink API
+
+  // Amount information
+  amount: numeric("amount").notNull(), // unscaledValue from amount.value
+  amountScale: integer("amount_scale").default(0), // scale from amount.value
+  currencyCode: varchar("currency_code", { length: 3 }).notNull(), // currencyCode from amount
+
+  // Dates
+  bookedDate: varchar("booked_date", { length: 10 }), // dates.booked (YYYY-MM-DD)
+  transactionDate: varchar("transaction_date", { length: 10 }), // dates.transaction (YYYY-MM-DD)
+  valueDate: varchar("value_date", { length: 10 }), // dates.value (YYYY-MM-DD)
+  bookedDateTime: timestamp("booked_date_time"), // bookedDateTime (ISO-8601)
+  transactionDateTime: timestamp("transaction_date_time"), // transactionDateTime (ISO-8601)
+  valueDateTime: timestamp("value_date_time"), // valueDateTime (ISO-8601)
+
+  // Descriptions
+  displayDescription: varchar("display_description", { length: 500 }), // descriptions.display
+  originalDescription: varchar("original_description", { length: 500 }), // descriptions.original
+  detailedDescription: text("detailed_description"), // descriptions.detailed.unstructured
+
+  // Status and type
+  status: varchar("status", { length: 20 }).notNull(), // status (BOOKED, PENDING, UNDEFINED)
+  transactionType: varchar("transaction_type", { length: 50 }), // types.type
+  financialInstitutionTypeCode: varchar("fi_type_code", { length: 10 }), // types.financialInstitutionTypeCode
+
+  // Additional fields
+  reference: varchar("reference", { length: 255 }), // reference
+  providerTransactionId: varchar("provider_transaction_id", { length: 255 }), // identifiers.providerTransactionId
+  merchantName: varchar("merchant_name", { length: 255 }), // merchantInformation.merchantName
+  merchantCategoryCode: varchar("merchant_category_code", { length: 10 }), // merchantInformation.merchantCategoryCode
+
+  // Category information (PFM)
+  categoryId: varchar("category_id", { length: 255 }), // categories.pfm.id
+  categoryName: varchar("category_name", { length: 255 }), // categories.pfm.name
+
+  // Counterparty information
+  payeeName: varchar("payee_name", { length: 255 }), // counterparties.payee.name
+  payeeAccountNumber: varchar("payee_account_number", { length: 50 }), // counterparties.payee.identifiers.financialInstitution.accountNumber
+  payerName: varchar("payer_name", { length: 255 }), // counterparties.payer.name
+  payerAccountNumber: varchar("payer_account_number", { length: 50 }), // counterparties.payer.identifiers.financialInstitution.accountNumber
+
+  // Mutability
+  providerMutability: varchar("provider_mutability", { length: 50 }), // providerMutability
+
+  // Internal tracking
   bankAccountId: integer("bank_account_id")
     .notNull()
     .references(() => bankAccount.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at")
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: timestamp("updated_at")
+    .$defaultFn(() => new Date())
+    .notNull(),
 });
 
 // Export schema object for Drizzle Kit configuration

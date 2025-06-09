@@ -11,6 +11,6 @@
     "rootDirs": ["src", "db", "drizzle"],
     "moduleResolution": "NodeNext"
   },
-  "include": ["src/**/*", "drizzle/**/*", "db/**/*"],
+  "include": ["src/**/*", "drizzle/**/*", "db/**/*", "scripts/**/*"],
   "exclude": ["node_modules"]
 }

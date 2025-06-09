@@ -54,6 +54,25 @@ interface TinkAccountsResponse {
   accounts: TinkAccount[];
 }
 
+interface TinkCreateUserRequest {
+  external_user_id?: string;
+  market: string;
+  locale: string;
+}
+
+interface TinkCreateUserResponse {
+  external_user_id?: string;
+  user_id: string;
+}
+
+interface TinkGrantUserAccessResponse {
+  code: string;
+}
+
+interface TinkUserAuthorizationCodeResponse {
+  code: string;
+}
+
 export class TinkService {
   private readonly clientId: string;
   private readonly clientSecret: string;
@@ -74,6 +93,454 @@ export class TinkService {
       );
     }
   }
+
+  //____________________________________________________________________________________
+  //____________________________________________________________________________________
+  // NOTE:
+  // Provide continuous access to the user's bank accounts
+  //____________________________________________________________________________________
+  //____________________________________________________________________________________
+
+  /**
+   * Get client access token for user creation
+   * Uses client_credentials grant type with user:create scope
+   */
+  async getClientAccessToken(): Promise<TinkTokenResponse> {
+    const requestBody = new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+      scope: "user:create",
+    });
+
+    const response = await fetch(`${this.baseUrl}/api/v1/oauth/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: requestBody,
+    });
+
+    console.log("Tink client access token response:", {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Tink client access token error:", errorText);
+      throw new Error(
+        `Failed to get client access token: ${response.status} ${errorText}`
+      );
+    }
+
+    const tokenData = (await response.json()) as TinkTokenResponse;
+    console.log("Tink client access token success:", {
+      hasAccessToken: !!tokenData.access_token,
+      tokenType: tokenData.token_type,
+      expiresIn: tokenData.expires_in,
+      scope: tokenData.scope,
+    });
+
+    return tokenData;
+  }
+
+  /**
+   * Create a new user in Tink
+   * Uses client access token with user:create scope
+   */
+  async createUser(
+    clientAccessToken: string,
+    externalUserId: string,
+    market: string = "FR",
+    locale: string = "en_US"
+  ): Promise<TinkCreateUserResponse> {
+    const requestBody: TinkCreateUserRequest = {
+      external_user_id: externalUserId,
+      market,
+      locale,
+    };
+
+    const response = await fetch(`${this.baseUrl}/api/v1/user/create`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${clientAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("Tink create user response:", {
+      status: response.status,
+      statusText: response.statusText,
+      externalUserId,
+      market,
+      locale,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Tink create user error:", errorText);
+      throw new Error(`Failed to create user: ${response.status} ${errorText}`);
+    }
+
+    const userData = (await response.json()) as TinkCreateUserResponse;
+    console.log("Tink create user success:", {
+      externalUserId: userData.external_user_id,
+      userId: userData.user_id,
+    });
+
+    return userData;
+  }
+
+  /**
+   * Get client access token for authorization grants
+   * Uses client_credentials grant type with authorization:grant scope
+   */
+  async getAuthorizationGrantToken(): Promise<TinkTokenResponse> {
+    const requestBody = new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+      scope: "authorization:grant",
+    });
+
+    const response = await fetch(`${this.baseUrl}/api/v1/oauth/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: requestBody,
+    });
+
+    console.log("Tink authorization grant token response:", {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Tink authorization grant token error:", errorText);
+      throw new Error(
+        `Failed to get authorization grant token: ${response.status} ${errorText}`
+      );
+    }
+
+    const tokenData = (await response.json()) as TinkTokenResponse;
+    console.log("Tink authorization grant token success:", {
+      hasAccessToken: !!tokenData.access_token,
+      tokenType: tokenData.token_type,
+      expiresIn: tokenData.expires_in,
+      scope: tokenData.scope,
+    });
+
+    return tokenData;
+  }
+
+  /**
+   * Grant user access for bank account connection
+   * Uses authorization grant token to delegate access to a user
+   */
+  async grantUserAccess(
+    authorizationGrantToken: string,
+    options: {
+      userId?: string;
+      externalUserId?: string;
+      idHint?: string;
+      scope?: string;
+    }
+  ): Promise<TinkGrantUserAccessResponse> {
+    // Validate that either userId or externalUserId is provided
+    if (!options.userId && !options.externalUserId) {
+      throw new Error("Either userId or externalUserId must be provided");
+    }
+
+    // Default scope as per Tink documentation
+    const defaultScope =
+      "authorization:read,authorization:grant,credentials:refresh,credentials:read,credentials:write,providers:read,user:read";
+
+    const requestBody = new URLSearchParams({
+      actor_client_id: "df05e4b379934cd09963197cc855bfe9", // Fixed value from Tink
+      scope: options.scope || defaultScope,
+    });
+
+    // Add user identification (only one should be provided)
+    if (options.userId) {
+      requestBody.append("user_id", options.userId);
+    } else if (options.externalUserId) {
+      requestBody.append("external_user_id", options.externalUserId);
+    }
+
+    // Add optional id_hint
+    if (options.idHint) {
+      requestBody.append("id_hint", options.idHint);
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/oauth/authorization-grant/delegate`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authorizationGrantToken}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: requestBody,
+      }
+    );
+
+    console.log("Tink grant user access response:", {
+      status: response.status,
+      statusText: response.statusText,
+      userId: options.userId,
+      externalUserId: options.externalUserId,
+      idHint: options.idHint,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Tink grant user access error:", errorText);
+      throw new Error(
+        `Failed to grant user access: ${response.status} ${errorText}`
+      );
+    }
+
+    const grantData = (await response.json()) as TinkGrantUserAccessResponse;
+    console.log("Tink grant user access success:", {
+      hasCode: !!grantData.code,
+      codeLength: grantData.code?.length,
+    });
+
+    return grantData;
+  }
+
+  /**
+   * Build complete Tink URL with authorization code for user bank connection
+   * This URL allows users to authenticate with their bank and connect accounts
+   */
+  buildTinkUrlWithAuthorizationCode(
+    authorizationCode: string,
+    options: {
+      market?: string;
+      locale?: string;
+      state?: string;
+      redirectUri?: string;
+    } = {}
+  ): string {
+    const {
+      market = "FR",
+      locale = "en_US",
+      state,
+      redirectUri = this.redirectUri,
+    } = options;
+
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      authorization_code: authorizationCode,
+      redirect_uri: redirectUri,
+      market,
+      locale,
+    });
+
+    // Add optional state parameter for CSRF protection and user tracking
+    if (state) {
+      params.append("state", state);
+    }
+
+    const url = `https://link.tink.com/1.0/transactions/connect-accounts?${params.toString()}`;
+
+    console.log("Built Tink URL:", {
+      hasAuthorizationCode: !!authorizationCode,
+      market,
+      locale,
+      hasState: !!state,
+      redirectUri,
+    });
+
+    return url;
+  }
+
+  /**
+   * Parse callback URL parameters from Tink redirect
+   * Extracts credentials_id, state, and other parameters from the callback
+   */
+  parseCallbackUrl(callbackUrl: string): {
+    clientId?: string;
+    credentialsId?: string;
+    state?: string;
+    redirectUri?: string;
+  } | null {
+    try {
+      const url = new URL(callbackUrl);
+      const params = url.searchParams;
+
+      const result = {
+        clientId: params.get("client_id") || undefined,
+        credentialsId: params.get("credentials_id") || undefined,
+        state: params.get("state") || undefined,
+        redirectUri: params.get("redirect_uri") || undefined,
+      };
+
+      console.log("Parsed callback URL:", {
+        hasCredentialsId: !!result.credentialsId,
+        hasState: !!result.state,
+        clientId: result.clientId,
+      });
+
+      return result;
+    } catch (error) {
+      console.error("Failed to parse callback URL:", { callbackUrl, error });
+      return null;
+    }
+  }
+
+  /**
+   * Generate authorization code for existing user to access their data
+   * Uses client access token with authorization:grant scope
+   */
+  async generateUserAuthorizationCode(
+    clientAccessToken: string,
+    options: {
+      userId?: string;
+      externalUserId?: string;
+      scope?: string;
+    }
+  ): Promise<TinkUserAuthorizationCodeResponse> {
+    // Validate that either userId or externalUserId is provided
+    if (!options.userId && !options.externalUserId) {
+      throw new Error("Either userId or externalUserId must be provided");
+    }
+
+    // Default scope for data access
+    const defaultScope =
+      "accounts:read,balances:read,transactions:read,provider-consents:read";
+
+    const requestBody = new URLSearchParams({
+      scope: options.scope || defaultScope,
+    });
+
+    // Add user identification (only one should be provided)
+    if (options.userId) {
+      requestBody.append("user_id", options.userId);
+    } else if (options.externalUserId) {
+      requestBody.append("external_user_id", options.externalUserId);
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/oauth/authorization-grant`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${clientAccessToken}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: requestBody,
+      }
+    );
+
+    console.log("Tink user authorization code response:", {
+      status: response.status,
+      statusText: response.statusText,
+      userId: options.userId,
+      externalUserId: options.externalUserId,
+      scope: options.scope || defaultScope,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Tink user authorization code error:", errorText);
+      throw new Error(
+        `Failed to generate user authorization code: ${response.status} ${errorText}`
+      );
+    }
+
+    const codeData =
+      (await response.json()) as TinkUserAuthorizationCodeResponse;
+    console.log("Tink user authorization code success:", {
+      hasCode: !!codeData.code,
+      codeLength: codeData.code?.length,
+    });
+
+    return codeData;
+  }
+
+  /**
+   * Get user access token for data fetching
+   * Exchange user authorization code for user access token
+   */
+  async getUserAccessToken(
+    userAuthorizationCode: string
+  ): Promise<TinkTokenResponse> {
+    const requestBody = new URLSearchParams({
+      grant_type: "authorization_code",
+      code: userAuthorizationCode,
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+    });
+
+    const response = await fetch(`${this.baseUrl}/api/v1/oauth/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: requestBody,
+    });
+
+    console.log("Tink user access token response:", {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Tink user access token error:", errorText);
+      throw new Error(
+        `Failed to get user access token: ${response.status} ${errorText}`
+      );
+    }
+
+    const tokenData = (await response.json()) as TinkTokenResponse;
+    console.log("Tink user access token success:", {
+      hasAccessToken: !!tokenData.access_token,
+      hasRefreshToken: !!tokenData.refresh_token,
+      tokenType: tokenData.token_type,
+      expiresIn: tokenData.expires_in,
+      scope: tokenData.scope,
+    });
+
+    return tokenData;
+  }
+
+  /**
+   * Complete flow to get user access token for data fetching
+   * Combines authorization code generation and token exchange
+   */
+  async getUserAccessTokenFlow(options: {
+    userId?: string;
+    externalUserId?: string;
+    scope?: string;
+  }): Promise<TinkTokenResponse> {
+    // 1. Get client access token for authorization grants
+    const clientToken = await this.getAuthorizationGrantToken();
+
+    // 2. Generate user authorization code
+    const authCode = await this.generateUserAuthorizationCode(
+      clientToken.access_token,
+      options
+    );
+
+    // 3. Exchange authorization code for user access token
+    const userToken = await this.getUserAccessToken(authCode.code);
+
+    return userToken;
+  }
+
+  //____________________________________________________________________________________
+  //____________________________________________________________________________________
+  //____________________________________________________________________________________
+  //____________________________________________________________________________________
 
   /**
    * Exchange authorization code for access token
@@ -109,7 +576,7 @@ export class TinkService {
       );
     }
 
-    const tokenData = await response.json();
+    const tokenData = (await response.json()) as TinkTokenResponse;
     console.log("Tink token exchange success:", {
       hasAccessToken: !!tokenData.access_token,
       tokenType: tokenData.token_type,
@@ -146,7 +613,8 @@ export class TinkService {
       );
     }
 
-    const data: TinkAccountsResponse = await response.json();
+    const data: TinkAccountsResponse =
+      (await response.json()) as TinkAccountsResponse;
 
     console.log("Fetched accounts from Tink:", {
       accountCount: data.accounts?.length || 0,
@@ -187,14 +655,14 @@ export class TinkService {
       );
     }
 
-    return response.json();
+    return response.json() as Promise<TinkTokenResponse>;
   }
 
   /**
    * Store Tink accounts in database
    */
   async storeAccounts(
-    db: NodePgDatabase<any>,
+    db: NodePgDatabase<typeof schema>,
     userId: string,
     accounts: TinkAccount[],
     accessToken: string,
@@ -287,7 +755,7 @@ export class TinkService {
         accountName: account.name,
         accountType: account.type,
         financialInstitutionId: account.financialInstitutionId,
-        balance: balanceValue != null ? Math.round(balanceValue * 100) : 0, // Convert to cents, default to 0 if undefined
+        balance: balanceValue !== null ? Math.round(balanceValue * 100) : 0, // Convert to cents, default to 0 if undefined
         currency,
         iban: account.identifiers?.iban?.iban,
         lastRefreshed: account.dates?.lastRefreshed

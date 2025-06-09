@@ -43,14 +43,14 @@ export const accountRouter = router({
     .output(z.array(bankAccountSchema))
     .query(async ({ input, ctx }) => {
       const accounts = await accountService.getAccounts(ctx.db, ctx.user.id);
-      console.log(
-        "getAccounts called for user:",
-        ctx.user.id,
-        "found:",
-        accounts.length,
-        "accounts"
+      ctx.req.server.log.debug(
+        {
+          userId: ctx.user.id,
+          count: accounts.length,
+          accounts: accounts,
+        },
+        "Fetched accounts"
       );
-      console.log("Accounts data:", accounts);
       return accounts;
     }),
 

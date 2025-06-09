@@ -86,11 +86,16 @@ export class TinkService {
     this.redirectUri = process.env.TINK_REDIRECT_URI!;
     this.baseUrl = process.env.TINK_API_URL || "https://api.tink.com";
     this.actorClientId = process.env.TINK_ACTOR_CLIENT_ID!;
-    if (!this.clientId || !this.clientSecret || !this.redirectUri) {
+    if (
+      !this.clientId ||
+      !this.clientSecret ||
+      !this.redirectUri ||
+      !this.actorClientId
+    ) {
       throw new Error(
         `Missing required Tink environment variables: clientId=${!!this
           .clientId}, clientSecret=${!!this.clientSecret}, redirectUri=${!!this
-          .redirectUri}`
+          .redirectUri}, actorClientId=${!!this.actorClientId}`
       );
     }
   }

@@ -108,7 +108,10 @@ export const transaction = pgTable("transactions", {
   tinkTransactionId: varchar("tink_transaction_id", { length: 255 })
     .notNull()
     .unique(), // id from Tink API
-  tinkAccountId: varchar("tink_account_id", { length: 255 }).notNull(), // accountId from Tink API
+  tinkAccountId: varchar("tink_account_id", { length: 255 })
+    .notNull()
+    // leverage the UNIQUE key on bank_accounts.tink_account_id
+    .references(() => bankAccount.tinkAccountId, { onDelete: "cascade" }),
 
   // Amount information
   amount: numeric("amount").notNull(), // unscaledValue from amount.value
@@ -123,6 +126,24 @@ export const transaction = pgTable("transactions", {
   transactionDateTime: timestamp("transaction_date_time"), // transactionDateTime (ISO-8601)
   valueDateTime: timestamp("value_date_time"), // valueDateTime (ISO-8601)
 
+  // TODO: Use proper date/timestamptz column types instead of varchar
+  //   Use proper date/timestamptz column types instead of varchar
+  // Storing ISO strings in text columns prevents you from leveraging PostgreSQL’s rich date-arithmetic and indexing.
+
+  // +import { date, timestamptz } from "drizzle-orm/pg-core";
+  // …
+  // -  bookedDate: varchar("booked_date", { length: 10 }), // dates.booked
+  // -  transactionDate: varchar("transaction_date", { length: 10 }), // dates.transaction
+  // -  valueDate: varchar("value_date", { length: 10 }), // dates.value
+  // -  bookedDateTime: timestamp("booked_date_time"),     // without timezone
+  // -  transactionDateTime: timestamp("transaction_date_time"),
+  // -  valueDateTime: timestamp("value_date_time"),
+  // +  bookedDate: date("booked_date"),
+  // +  transactionDate: date("transaction_date"),
+  // +  valueDate: date("value_date"),
+  // +  bookedDateTime: timestamptz("booked_date_time"),
+  // +  transactionDateTime: timestamptz("transaction_date_time"),
+  // +  valueDateTime: timestamptz("value_date_time"),
   // Descriptions
   displayDescription: varchar("display_description", { length: 500 }), // descriptions.display
   originalDescription: varchar("original_description", { length: 500 }), // descriptions.original

@@ -56,6 +56,30 @@ export const transactionService = {
     return {
       transactions: results,
       // In a real implementation, you'd generate the next page token based on the last result
+      //       pageToken is accepted but never used – pagination is incomplete
+      // The service advertises token-based pagination, yet the implementation ignores pageToken and always starts from the first row, returning a placeholder token.
+
+      // At minimum, document the limitation; ideally implement proper offset/seek-based paging:
+
+      // -// TODO: implement proper paging – pageToken is currently ignored
+      // -const results = await db
+      // +const offset = filters?.pageToken ? Number(filters.pageToken) : 0;
+      // +
+      // +const results = await db
+      //    .select()
+      //    .from(transaction)
+      //    .where(and(...conditions))
+      // -  .limit(pageSize);
+      // +  .limit(pageSize)
+      // +  .offset(offset);
+
+      //  return {
+      //    transactions: results,
+      // -  nextPageToken:
+      // -    results.length === pageSize ? "next_page_token_here" : undefined,
+      // +  nextPageToken:
+      // +    results.length === pageSize ? String(offset + pageSize) : undefined,
+      //  };
       nextPageToken:
         results.length === pageSize ? "next_page_token_here" : undefined,
     };
@@ -78,93 +102,6 @@ export const transactionService = {
       )
       .limit(1);
     return result[0] || null;
-  },
-
-  // Create transaction with Tink-style data structure
-  async createTransaction(
-    db: NodePgDatabase<typeof schema>,
-    data: {
-      userId: string;
-      accountId: string;
-      amount: {
-        currencyCode: string;
-        value: {
-          scale: string;
-          unscaledValue: string;
-        };
-      };
-      status: "UNDEFINED" | "PENDING" | "BOOKED";
-      dates: {
-        booked: string;
-        transaction?: string;
-        value?: string;
-      };
-      descriptions: {
-        display: string;
-        original: string;
-        detailed?: {
-          unstructured?: string;
-        };
-      };
-      reference?: string;
-      merchantInformation?: {
-        merchantCategoryCode?: string;
-        merchantName?: string;
-      };
-      counterparties?: {
-        payee?: {
-          name?: string;
-          identifiers?: {
-            financialInstitution?: {
-              accountNumber?: string;
-            };
-          };
-        };
-        payer?: {
-          name?: string;
-          identifiers?: {
-            financialInstitution?: {
-              accountNumber?: string;
-            };
-          };
-        };
-      };
-    }
-  ) {
-    // Transform the Tink-style data to match your database schema
-    const transformedData = {
-      userId: data.userId,
-      tinkTransactionId: `tink_${Date.now()}_${Math.random()}`, // Generate unique ID
-      tinkAccountId: data.accountId,
-      bankAccountId: 1, // You'll need to provide this based on your logic
-      amount: data.amount.value.unscaledValue,
-      amountScale: parseInt(data.amount.value.scale),
-      currencyCode: data.amount.currencyCode,
-      status: data.status,
-      bookedDate: data.dates.booked,
-      transactionDate: data.dates.transaction,
-      valueDate: data.dates.value,
-      displayDescription: data.descriptions.display,
-      originalDescription: data.descriptions.original,
-      detailedDescription: data.descriptions.detailed?.unstructured,
-      reference: data.reference,
-      merchantCategoryCode: data.merchantInformation?.merchantCategoryCode,
-      merchantName: data.merchantInformation?.merchantName,
-      payeeName: data.counterparties?.payee?.name,
-      payeeAccountNumber:
-        data.counterparties?.payee?.identifiers?.financialInstitution
-          ?.accountNumber,
-      payerName: data.counterparties?.payer?.name,
-      payerAccountNumber:
-        data.counterparties?.payer?.identifiers?.financialInstitution
-          ?.accountNumber,
-    };
-
-    const result = await db
-      .insert(transaction)
-      .values(transformedData)
-      .returning();
-    return result[0];
   },
 
   // Update transaction

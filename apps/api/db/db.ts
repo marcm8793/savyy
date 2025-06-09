@@ -15,15 +15,20 @@ export function createDatabase(
   connectionString?: string,
   poolConfig?: PoolConfig
 ) {
-  const pool = new Pool({
-    connectionString: connectionString || process.env.DATABASE_URL,
-    ...poolConfig,
-  });
+  try {
+    const pool = new Pool({
+      connectionString: connectionString || process.env.DATABASE_URL,
+      ...poolConfig,
+    });
 
-  return {
-    db: drizzle(pool, { schema }),
-    pool,
-  };
+    return {
+      db: drizzle(pool, { schema }),
+      pool,
+    };
+  } catch (error) {
+    console.error("Error creating database:", error);
+    throw error;
+  }
 }
 
 // For external use (like Better Auth), create when needed

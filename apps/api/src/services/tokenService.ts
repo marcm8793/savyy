@@ -1,7 +1,7 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { and, eq } from "drizzle-orm";
 import { BankAccount, bankAccount, schema } from "../../db/schema";
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 
 export class TokenService {
   private readonly STATE_SECRET: string;
@@ -142,7 +142,7 @@ export class TokenService {
     const payload = {
       userId,
       timestamp: Date.now(),
-      nonce: Math.random().toString(36).substring(2, 18),
+      nonce: randomBytes(16).toString("hex"),
     };
 
     const payloadStr = JSON.stringify(payload);

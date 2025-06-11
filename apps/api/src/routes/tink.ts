@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { tinkService } from "../services/tinkService";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { AccountsAndBalancesService } from "../services/accountsAndBalancesService.js";
+import { tokenService } from "../services/tokenService";
 
 const tinkRoutes: FastifyPluginAsync = async (fastify) => {
   // Tink OAuth callback endpoint
@@ -26,47 +27,44 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Handle state parameter to get user ID and sync accounts
       if (state) {
-        try {
-          // Parse state token manually (base64url decode)
-          const decoded = Buffer.from(state, "base64url").toString("utf-8");
-          const stateData = JSON.parse(decoded) as {
-            userId?: string;
-            timestamp?: number;
-            nonce?: string;
-          };
+        // Verify secure state token
+        const stateData = tokenService.verifySecureStateToken(state);
 
-          if (stateData?.userId) {
-            fastify.log.info("Decoded state parameter", {
+        if (!stateData) {
+          fastify.log.error("Invalid or expired state token");
+          const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+          return reply.redirect(`${clientUrl}/accounts?error=invalid_state`);
+        }
+
+        if (stateData.userId) {
+          fastify.log.info("Verified state parameter", {
+            userId: stateData.userId,
+          });
+
+          try {
+            // Exchange authorization code for user access token
+            const tokenResponse = await tinkService.getUserAccessToken(code);
+
+            // Use AccountsAndBalancesService to sync accounts
+            const accountsService = new AccountsAndBalancesService();
+            const syncResult = await accountsService.syncAccountsAndBalances(
+              fastify.db,
+              String(stateData.userId),
+              tokenResponse.access_token,
+              tokenResponse.scope,
+              tokenResponse.expires_in
+            );
+
+            fastify.log.info("Accounts synced successfully", {
               userId: stateData.userId,
+              accountCount: syncResult.count,
             });
-
-            try {
-              // Exchange authorization code for user access token
-              const tokenResponse = await tinkService.getUserAccessToken(code);
-
-              // Use AccountsAndBalancesService to sync accounts
-              const accountsService = new AccountsAndBalancesService();
-              const syncResult = await accountsService.syncAccountsAndBalances(
-                fastify.db,
-                String(stateData.userId),
-                tokenResponse.access_token,
-                tokenResponse.scope,
-                tokenResponse.expires_in
-              );
-
-              fastify.log.info("Accounts synced successfully", {
-                userId: stateData.userId,
-                accountCount: syncResult.count,
-              });
-            } catch (syncError) {
-              fastify.log.error("Failed to sync accounts", {
-                userId: stateData.userId,
-                error: syncError,
-              });
-            }
+          } catch (syncError) {
+            fastify.log.error("Failed to sync accounts", {
+              userId: stateData.userId,
+              error: syncError,
+            });
           }
-        } catch (parseError) {
-          fastify.log.error("Failed to parse state token:", parseError);
         }
       } else {
         // If no state parameter, just exchange the code to validate it
@@ -74,18 +72,6 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
         await tinkService.getUserAccessToken(code);
         fastify.log.info("Code validation successful");
       }
-
-      // TODO:
-      // No replay protection on the state parameter
-      // state is only base-64 JSON; it is neither signed nor age-checked.
-      // An attacker can replay or tamper with an old token and trigger account-sync for another user.
-
-      // Mitigation options:
-
-      // HMAC-sign the token (e.g. crypto.createHmac(...).update(payload).digest("base64url")) and verify it here.
-      // Enforce a max age (e.g. ≤ 10 min) before starting the sync.
-      // Store issued nonces server-side and mark them as used.
-      // Fail the request with 400 if validation fails.
 
       const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
       return reply.redirect(`${clientUrl}/accounts?connected=true`);
@@ -138,6 +124,12 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
 
     fastify.post("/api/tink/connect", async (request, reply) => {
       try {
+        // TODO:
+        //         market and locale are extracted via type-cast but never validated.
+        // Senders can post { market: 123, locale: {} } and the code will happily build an invalid URL.
+
+        // Use Fastify’s schema or Zod or other solution to validate the request body market and locale
+
         const { market = "FR", locale = "en_US" } = request.body as {
           market?: string;
           locale?: string;
@@ -148,15 +140,8 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.status(401).send({ error: "User not authenticated" });
         }
 
-        // Generate state parameter with user ID for security (simple base64 encoding)
-        const stateData = {
-          userId: user.id,
-          timestamp: Date.now(),
-          nonce: Math.random().toString(36).substring(2, 18),
-        };
-        const state = Buffer.from(JSON.stringify(stateData)).toString(
-          "base64url"
-        );
+        // Generate secure state parameter with HMAC signature
+        const state = tokenService.createSecureStateToken(user.id);
 
         // Get authorization grant token and create user access
         const authToken = await tinkService.getAuthorizationGrantToken();

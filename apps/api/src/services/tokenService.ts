@@ -1,9 +1,15 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { and, eq } from "drizzle-orm";
 import { BankAccount, bankAccount, schema } from "../../db/schema";
+import { createHmac, timingSafeEqual } from "crypto";
 
 export class TokenService {
+  private readonly STATE_SECRET =
+    process.env.STATE_SECRET || "randomsecret-&savydjsiqdop564634dsq";
+  private readonly MAX_STATE_AGE = 10 * 60 * 1000; // 10 minutes
+
   constructor() {}
+
   /**
    * Check if a token is expired or will expire soon
    */
@@ -122,6 +128,75 @@ export class TokenService {
       tokenScope: account.tokenScope,
       isExpired,
     };
+  }
+
+  /**
+   * Create a secure state token with HMAC signature for OAuth flows
+   */
+  createSecureStateToken(userId: string): string {
+    const payload = {
+      userId,
+      timestamp: Date.now(),
+      nonce: Math.random().toString(36).substring(2, 18),
+    };
+
+    const payloadStr = JSON.stringify(payload);
+    const signature = createHmac("sha256", this.STATE_SECRET)
+      .update(payloadStr)
+      .digest("base64url");
+
+    return Buffer.from(`${payloadStr}.${signature}`).toString("base64url");
+  }
+
+  /**
+   * Verify a secure state token and return the payload if valid
+   */
+  verifySecureStateToken(
+    token: string
+  ): { userId: string; timestamp: number; nonce: string } | null {
+    try {
+      const decoded = Buffer.from(token, "base64url").toString("utf-8");
+      const [payloadStr, signature] = decoded.split(".");
+
+      if (!payloadStr || !signature) {
+        return null;
+      }
+
+      // Verify signature
+      const expectedSignature = createHmac("sha256", this.STATE_SECRET)
+        .update(payloadStr)
+        .digest("base64url");
+
+      const signatureBuffer = Buffer.from(signature, "base64url");
+      const expectedBuffer = Buffer.from(expectedSignature, "base64url");
+
+      if (!timingSafeEqual(signatureBuffer, expectedBuffer)) {
+        return null;
+      }
+
+      const payload = JSON.parse(payloadStr) as {
+        userId?: string;
+        timestamp?: number;
+        nonce?: string;
+      };
+
+      if (!payload.userId || !payload.timestamp || !payload.nonce) {
+        return null;
+      }
+
+      // Check age
+      if (Date.now() - payload.timestamp > this.MAX_STATE_AGE) {
+        return null;
+      }
+
+      return {
+        userId: payload.userId,
+        timestamp: payload.timestamp,
+        nonce: payload.nonce,
+      };
+    } catch {
+      return null;
+    }
   }
 }
 

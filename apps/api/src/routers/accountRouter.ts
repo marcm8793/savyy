@@ -6,6 +6,7 @@ import { AccountsAndBalancesService } from "../services/accountsAndBalancesServi
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { bankAccount } from "../../db/schema.js";
+import { tokenService } from "../services/tokenService";
 
 // Define Zod schemas manually for bank accounts (updated to match database schema)
 const bankAccountSchema = z.object({
@@ -87,6 +88,7 @@ export const accountRouter = router({
       }
     }),
 
+  // TODO: remove duplicate Tink connection URL endpoints
   // Get Tink connection URL using existing flow
   getTinkConnectionUrl: protectedProcedure
     .input(
@@ -296,15 +298,8 @@ export const accountRouter = router({
           }
         }
 
-        // Generate state parameter with user ID for security (simple base64 encoding)
-        const stateData = {
-          userId: ctx.user.id,
-          timestamp: Date.now(),
-          nonce: Math.random().toString(36).substring(2, 18),
-        };
-        const state = Buffer.from(JSON.stringify(stateData)).toString(
-          "base64url"
-        );
+        // Generate secure state parameter with HMAC signature
+        const state = tokenService.createSecureStateToken(ctx.user.id);
 
         // Get authorization grant token and create user access
         const authToken = await tinkService.getAuthorizationGrantToken();

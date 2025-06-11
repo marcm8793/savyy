@@ -4,11 +4,14 @@ import { BankAccount, bankAccount, schema } from "../../db/schema";
 import { createHmac, timingSafeEqual } from "crypto";
 
 export class TokenService {
-  private readonly STATE_SECRET =
-    process.env.STATE_SECRET || "randomsecret-&savydjsiqdop564634dsq";
-  private readonly MAX_STATE_AGE = 10 * 60 * 1000; // 10 minutes
+  private readonly STATE_SECRET = process.env.STATE_SECRET;
 
-  constructor() {}
+  constructor() {
+    if (!this.STATE_SECRET) {
+      throw new Error("STATE_SECRET environment variable is required");
+    }
+  }
+  private readonly MAX_STATE_AGE = 10 * 60 * 1000; // 10 minutes
 
   /**
    * Check if a token is expired or will expire soon
@@ -141,7 +144,7 @@ export class TokenService {
     };
 
     const payloadStr = JSON.stringify(payload);
-    const signature = createHmac("sha256", this.STATE_SECRET)
+    const signature = createHmac("sha256", this.STATE_SECRET!)
       .update(payloadStr)
       .digest("base64url");
 
@@ -163,7 +166,7 @@ export class TokenService {
       }
 
       // Verify signature
-      const expectedSignature = createHmac("sha256", this.STATE_SECRET)
+      const expectedSignature = createHmac("sha256", this.STATE_SECRET!)
         .update(payloadStr)
         .digest("base64url");
 

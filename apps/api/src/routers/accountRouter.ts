@@ -30,11 +30,6 @@ const bankAccountSchema = z.object({
   updatedAt: z.date(),
 });
 
-const createBankAccountSchema = z.object({
-  accountName: z.string().min(1).max(255),
-  tinkAccountId: z.string().min(1).max(255),
-});
-
 // Define account router with proper schema integration
 export const accountRouter = router({
   // Get bank accounts for authenticated user
@@ -68,26 +63,6 @@ export const accountRouter = router({
       }
     }),
 
-  // Create a new bank account
-  createAccount: protectedProcedure
-    .input(createBankAccountSchema)
-    .output(bankAccountSchema)
-    .mutation(async ({ input, ctx }) => {
-      try {
-        return await accountService.createAccount(ctx.db, {
-          ...input,
-          userId: ctx.user.id,
-        });
-      } catch (error) {
-        ctx.req.server.log.error("Failed to create account:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create account",
-          cause: error,
-        });
-      }
-    }),
-
   // TODO: remove duplicate Tink connection URL endpoints
   // Get Tink connection URL using existing flow
   getTinkConnectionUrl: protectedProcedure
@@ -107,12 +82,12 @@ export const accountRouter = router({
       try {
         // Get client access token and create user in Tink if needed
         const clientToken = await tinkService.getClientAccessToken();
-        const tinkExternalUserId = `user_${ctx.user.id}_${Date.now()}`;
+        const userId = ctx.user.id;
 
         try {
           await tinkService.createUser(
             clientToken.access_token,
-            tinkExternalUserId,
+            userId,
             input.market,
             input.locale
           );
@@ -140,8 +115,7 @@ export const accountRouter = router({
         const grantResponse = await tinkService.grantUserAccess(
           authToken.access_token,
           {
-            externalUserId: tinkExternalUserId,
-            idHint: tinkExternalUserId,
+            userId: ctx.user.id,
           }
         );
 
@@ -270,12 +244,12 @@ export const accountRouter = router({
       try {
         // Get client access token and create user in Tink if needed
         const clientToken = await tinkService.getClientAccessToken();
-        const tinkExternalUserId = `user_${ctx.user.id}_${Date.now()}`;
+        const userId = ctx.user.id;
 
         try {
           await tinkService.createUser(
             clientToken.access_token,
-            tinkExternalUserId,
+            userId,
             input.market,
             input.locale
           );
@@ -306,8 +280,7 @@ export const accountRouter = router({
         const grantResponse = await tinkService.grantUserAccess(
           authToken.access_token,
           {
-            externalUserId: tinkExternalUserId,
-            idHint: tinkExternalUserId,
+            userId: userId,
           }
         );
 

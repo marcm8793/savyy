@@ -7,14 +7,14 @@ interface TinkTokenResponse {
 }
 
 interface TinkCreateUserRequest {
-  external_user_id?: string;
+  userId: string;
   market: string;
   locale: string;
 }
 
 interface TinkCreateUserResponse {
-  external_user_id?: string;
-  user_id: string;
+  user_id?: string;
+  tink_user_id: string;
 }
 
 interface TinkGrantUserAccessResponse {
@@ -110,12 +110,12 @@ export class TinkService {
    */
   async createUser(
     clientAccessToken: string,
-    externalUserId: string,
+    userId: string,
     market: string = "FR",
     locale: string = "en_US"
   ): Promise<TinkCreateUserResponse> {
     const requestBody: TinkCreateUserRequest = {
-      external_user_id: externalUserId,
+      userId: userId,
       market,
       locale,
     };
@@ -132,7 +132,7 @@ export class TinkService {
     console.log("Tink create user response:", {
       status: response.status,
       statusText: response.statusText,
-      externalUserId,
+      userId,
       market,
       locale,
     });
@@ -145,8 +145,8 @@ export class TinkService {
 
     const userData = (await response.json()) as TinkCreateUserResponse;
     console.log("Tink create user success:", {
-      externalUserId: userData.external_user_id,
       userId: userData.user_id,
+      tinkUserId: userData.tink_user_id,
     });
 
     return userData;
@@ -205,14 +205,13 @@ export class TinkService {
     authorizationGrantToken: string,
     options: {
       userId?: string;
-      externalUserId?: string;
-      idHint?: string;
+      tinkUserId?: string;
       scope?: string;
     }
   ): Promise<TinkGrantUserAccessResponse> {
     // Validate that either userId or externalUserId is provided
-    if (!options.userId && !options.externalUserId) {
-      throw new Error("Either userId or externalUserId must be provided");
+    if (!options.userId && !options.tinkUserId) {
+      throw new Error("Either userId or tinkUserId must be provided");
     }
 
     // Default scope as per Tink documentation
@@ -227,13 +226,13 @@ export class TinkService {
     // Add user identification (only one should be provided)
     if (options.userId) {
       requestBody.append("user_id", options.userId);
-    } else if (options.externalUserId) {
-      requestBody.append("external_user_id", options.externalUserId);
+    } else if (options.tinkUserId) {
+      requestBody.append("external_user_id", options.tinkUserId);
     }
 
     // Add optional id_hint
-    if (options.idHint) {
-      requestBody.append("id_hint", options.idHint);
+    if (options.tinkUserId) {
+      requestBody.append("id_hint", options.tinkUserId);
     }
 
     const response = await fetch(
@@ -252,8 +251,7 @@ export class TinkService {
       status: response.status,
       statusText: response.statusText,
       userId: options.userId,
-      externalUserId: options.externalUserId,
-      idHint: options.idHint,
+      tinkUserId: options.tinkUserId,
     });
 
     if (!response.ok) {
@@ -361,13 +359,13 @@ export class TinkService {
     clientAccessToken: string,
     options: {
       userId?: string;
-      externalUserId?: string;
+      tinkUserId?: string;
       scope?: string;
     }
   ): Promise<TinkUserAuthorizationCodeResponse> {
     // Validate that either userId or externalUserId is provided
-    if (!options.userId && !options.externalUserId) {
-      throw new Error("Either userId or externalUserId must be provided");
+    if (!options.userId && !options.tinkUserId) {
+      throw new Error("Either userId or tinkUserId must be provided");
     }
 
     // Default scope for data access
@@ -381,8 +379,8 @@ export class TinkService {
     // Add user identification (only one should be provided)
     if (options.userId) {
       requestBody.append("user_id", options.userId);
-    } else if (options.externalUserId) {
-      requestBody.append("external_user_id", options.externalUserId);
+    } else if (options.tinkUserId) {
+      requestBody.append("external_user_id", options.tinkUserId);
     }
 
     const response = await fetch(
@@ -401,7 +399,7 @@ export class TinkService {
       status: response.status,
       statusText: response.statusText,
       userId: options.userId,
-      externalUserId: options.externalUserId,
+      tinkUserId: options.tinkUserId,
       scope: options.scope || defaultScope,
     });
 
@@ -477,7 +475,7 @@ export class TinkService {
    */
   async getUserAccessTokenFlow(options: {
     userId?: string;
-    externalUserId?: string;
+    tinkUserId?: string;
     scope?: string;
   }): Promise<TinkTokenResponse> {
     // 1. Get client access token for authorization grants
@@ -494,11 +492,6 @@ export class TinkService {
 
     return userToken;
   }
-
-  //____________________________________________________________________________________
-  //____________________________________________________________________________________
-  //____________________________________________________________________________________
-  //____________________________________________________________________________________
 }
 
 export const tinkService = new TinkService();

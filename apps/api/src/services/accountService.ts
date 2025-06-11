@@ -12,15 +12,6 @@ export const accountService = {
       .from(bankAccount)
       .where(eq(bankAccount.userId, userId));
   },
-
-  async createAccount(
-    db: NodePgDatabase<typeof schema>,
-    data: typeof bankAccount.$inferInsert
-  ) {
-    const result = await db.insert(bankAccount).values(data).returning();
-
-    return result[0];
-  },
 };
 
 // Alternative: Create a service factory that receives the database instances

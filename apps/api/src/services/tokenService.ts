@@ -4,12 +4,14 @@ import { BankAccount, bankAccount, schema } from "../../db/schema";
 import { createHmac, timingSafeEqual } from "crypto";
 
 export class TokenService {
-  private readonly STATE_SECRET = process.env.STATE_SECRET;
+  private readonly STATE_SECRET: string;
 
   constructor() {
-    if (!this.STATE_SECRET) {
+    const secret = process.env.STATE_SECRET;
+    if (!secret) {
       throw new Error("STATE_SECRET environment variable is required");
     }
+    this.STATE_SECRET = secret;
   }
   private readonly MAX_STATE_AGE = 10 * 60 * 1000; // 10 minutes
 
@@ -144,7 +146,7 @@ export class TokenService {
     };
 
     const payloadStr = JSON.stringify(payload);
-    const signature = createHmac("sha256", this.STATE_SECRET!)
+    const signature = createHmac("sha256", this.STATE_SECRET)
       .update(payloadStr)
       .digest("base64url");
 
@@ -166,7 +168,7 @@ export class TokenService {
       }
 
       // Verify signature
-      const expectedSignature = createHmac("sha256", this.STATE_SECRET!)
+      const expectedSignature = createHmac("sha256", this.STATE_SECRET)
         .update(payloadStr)
         .digest("base64url");
 

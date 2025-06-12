@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { bankAccount } from "../../db/schema.js";
 import { tokenService } from "../services/tokenService";
+import { userService } from "../services/userService";
 
 // Define Zod schemas manually for bank accounts (updated to match database schema)
 const bankAccountSchema = z.object({
@@ -58,85 +59,6 @@ export const accountRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to fetch accounts",
-          cause: error,
-        });
-      }
-    }),
-
-  // TODO: remove duplicate Tink connection URL endpoints
-  // Get Tink connection URL using existing flow
-  getTinkConnectionUrl: protectedProcedure
-    .input(
-      z.object({
-        market: z.string().default("FR"),
-        locale: z.string().default("en_US"),
-      })
-    )
-    .output(
-      z.object({
-        url: z.string(),
-        message: z.string(),
-      })
-    )
-    .query(async ({ input, ctx }) => {
-      try {
-        // Get client access token and create user in Tink if needed
-        const clientToken = await tinkService.getClientAccessToken();
-        const userId = ctx.user.id;
-
-        try {
-          await tinkService.createUser(
-            clientToken.access_token,
-            userId,
-            input.market,
-            input.locale
-          );
-          ctx.req.server.log.debug("User created successfully in Tink");
-        } catch (error) {
-          // Check if user already exists (this is expected for returning users)
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          if (
-            errorMessage.includes("user_with_external_user_id_already_exists")
-          ) {
-            ctx.req.server.log.debug(
-              "User already exists in Tink, continuing with authorization"
-            );
-          } else {
-            ctx.req.server.log.warn(
-              "Unexpected error creating user in Tink:",
-              error
-            );
-          }
-        }
-
-        // Get authorization grant token and create user access
-        const authToken = await tinkService.getAuthorizationGrantToken();
-        const grantResponse = await tinkService.grantUserAccess(
-          authToken.access_token,
-          {
-            userId: ctx.user.id,
-          }
-        );
-
-        // Build connection URL using existing method
-        const connectionUrl = tinkService.buildTinkUrlWithAuthorizationCode(
-          grantResponse.code,
-          {
-            market: input.market,
-            locale: input.locale,
-          }
-        );
-
-        return {
-          url: connectionUrl,
-          message: "Redirect user to this URL to connect their bank account",
-        };
-      } catch (error) {
-        ctx.req.server.log.error("Failed to get Tink connection URL:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to generate connection URL",
           cause: error,
         });
       }
@@ -227,7 +149,7 @@ export const accountRouter = router({
     }),
 
   // Get secure Tink connection URL with state parameter
-  getTinkConnectionUrlSecure: protectedProcedure
+  connectBankAccount: protectedProcedure
     .input(
       z.object({
         market: z.string().default("FR"),
@@ -242,45 +164,85 @@ export const accountRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        // Get client access token and create user in Tink if needed
-        const clientToken = await tinkService.getClientAccessToken();
         const userId = ctx.user.id;
+        const idHint = ctx.user.name;
 
-        try {
-          await tinkService.createUser(
-            clientToken.access_token,
-            userId,
-            input.market,
-            input.locale
-          );
-          ctx.req.server.log.debug("User created successfully in Tink");
-        } catch (error) {
-          // Check if user already exists (this is expected for returning users)
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          if (
-            errorMessage.includes("user_with_external_user_id_already_exists")
-          ) {
-            ctx.req.server.log.debug(
-              "User already exists in Tink, continuing with authorization"
+        // Step 1: Check if we already have tink_user_id, if not create user in Tink
+        let storedTinkUserId = await userService.getTinkUserId(ctx.db, userId);
+
+        if (!storedTinkUserId) {
+          const clientToken = await tinkService.getClientAccessToken();
+
+          try {
+            const tinkUserResponse = await tinkService.createUser(
+              clientToken.access_token,
+              userId,
+              input.market,
+              input.locale,
+              idHint
             );
-          } else {
-            ctx.req.server.log.warn(
-              "Unexpected error creating user in Tink:",
-              error
-            );
+
+            // Store the Tink user ID in our database
+            if (tinkUserResponse.user_id) {
+              await userService.updateTinkUserId(
+                ctx.db,
+                userId,
+                tinkUserResponse.user_id
+              );
+
+              storedTinkUserId = tinkUserResponse.user_id;
+
+              ctx.req.server.log.debug("User created successfully in Tink", {
+                tinkUserId: tinkUserResponse.user_id,
+                externalUserId: tinkUserResponse.external_user_id,
+              });
+            } else {
+              ctx.req.server.log.warn(
+                "Tink user created but no user_id returned",
+                {
+                  response: tinkUserResponse,
+                }
+              );
+            }
+          } catch (error) {
+            // Check if user already exists (this is expected for returning users)
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            if (
+              errorMessage.includes("user_with_external_user_id_already_exists")
+            ) {
+              ctx.req.server.log.debug(
+                "User already exists in Tink, continuing with authorization"
+              );
+              // For existing users, we'll continue without the tink_user_id
+              // The authorization should still work with external_user_id
+            } else {
+              ctx.req.server.log.warn(
+                "Unexpected error creating user in Tink:",
+                error
+              );
+            }
           }
+        } else {
+          ctx.req.server.log.debug("User already has tink_user_id stored", {
+            tinkUserId: storedTinkUserId,
+          });
         }
+
+        // Step 2: Get authorization grant token
+        const authToken = await tinkService.getAuthorizationGrantToken();
 
         // Generate secure state parameter with HMAC signature
         const state = tokenService.createSecureStateToken(ctx.user.id);
 
-        // Get authorization grant token and create user access
-        const authToken = await tinkService.getAuthorizationGrantToken();
+        // Step 3: Grant user access using external_user_id
         const grantResponse = await tinkService.grantUserAccess(
           authToken.access_token,
           {
-            userId: userId,
+            tinkUserId: userId, // Use external_user_id (our internal user ID)
+            idHint: idHint,
+            scope:
+              "authorization:read,authorization:grant,credentials:refresh,credentials:read,credentials:write,providers:read,user:read",
           }
         );
 

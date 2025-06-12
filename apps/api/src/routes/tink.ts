@@ -95,7 +95,7 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
       const grantResponse = await tinkService.grantUserAccess(
         authToken.access_token,
         {
-          externalUserId: `temp_${Date.now()}`,
+          tinkUserId: `temp_${Date.now()}`,
           idHint: `temp_${Date.now()}`,
         }
       );
@@ -148,8 +148,8 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
         const grantResponse = await tinkService.grantUserAccess(
           authToken.access_token,
           {
-            externalUserId: `user_${user.id}`,
-            idHint: `user_${user.id}`,
+            userId: user.id,
+            idHint: user.name,
           }
         );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -41,27 +41,8 @@ export default function AccountsPage() {
   console.log("Is loading:", isLoading);
   console.log("Accounts length:", accounts?.length);
 
-  const { mutateAsync: syncAccounts } =
-    trpc.account.syncTinkAccounts.useMutation();
-  const { mutateAsync: getTinkConnectionUrl } =
-    trpc.account.getTinkConnectionUrlSecure.useMutation();
-
-  const handleSyncAccounts = useCallback(
-    async (authCode: string) => {
-      try {
-        const result = await syncAccounts({ code: authCode });
-        console.log("Accounts synced successfully:", result);
-        // Refresh the accounts list
-        refetch();
-        // Clear the code from URL
-        window.history.replaceState({}, "", "/accounts?connected=true");
-      } catch (error) {
-        console.error("Failed to sync accounts:", error);
-        setConnectionStatus("error");
-      }
-    },
-    [syncAccounts, refetch]
-  );
+  const { mutateAsync: connectBankAccount } =
+    trpc.account.connectBankAccount.useMutation();
 
   // Check for connection status from URL params
   useEffect(() => {
@@ -80,7 +61,7 @@ export default function AccountsPage() {
       setIsConnecting(true);
 
       // Call the tRPC procedure to get the secure connection URL
-      const result = await getTinkConnectionUrl({
+      const result = await connectBankAccount({
         market: "FR",
         locale: "en_US",
       });

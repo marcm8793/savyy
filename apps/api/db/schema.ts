@@ -18,6 +18,7 @@ export const user = pgTable("user", {
     .$defaultFn(() => false)
     .notNull(),
   image: text("image"),
+  tinkUserId: text("tink_user_id"),
   createdAt: timestamp("created_at")
     .$defaultFn(() => /* @__PURE__ */ new Date())
     .notNull(),
@@ -128,7 +129,7 @@ export const transaction = pgTable("transactions", {
 
   // TODO: Use proper date/timestamptz column types instead of varchar
   //   Use proper date/timestamptz column types instead of varchar
-  // Storing ISO strings in text columns prevents you from leveraging PostgreSQL’s rich date-arithmetic and indexing.
+  // Storing ISO strings in text columns prevents you from leveraging PostgreSQL's rich date-arithmetic and indexing.
 
   // +import { date, timestamptz } from "drizzle-orm/pg-core";
   // …

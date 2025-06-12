@@ -16,18 +16,12 @@ export type ProfileOutput = RouterOutputs["auth"]["getProfile"];
 // Account-related types (from server account router)
 export type GetAccountsInput = RouterInputs["account"]["getAccounts"];
 
-export type GetTinkConnectionUrlInput =
-  RouterInputs["account"]["getTinkConnectionUrl"];
-export type GetTinkConnectionUrlSecureInput =
-  RouterInputs["account"]["getTinkConnectionUrlSecure"];
+export type ConnectBankInput = RouterInputs["account"]["connectBankAccount"];
 export type SyncTinkAccountsInput = RouterInputs["account"]["syncTinkAccounts"];
 
 export type AccountsOutput = RouterOutputs["account"]["getAccounts"];
 
-export type TinkConnectionUrlOutput =
-  RouterOutputs["account"]["getTinkConnectionUrl"];
-export type TinkConnectionUrlSecureOutput =
-  RouterOutputs["account"]["getTinkConnectionUrlSecure"];
+export type ConnectBankOutput = RouterOutputs["account"]["connectBankAccount"];
 export type SyncTinkAccountsOutput =
   RouterOutputs["account"]["syncTinkAccounts"];
 

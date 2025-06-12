@@ -221,6 +221,10 @@ export class TinkService {
       );
     }
 
+    if (!options.idHint) {
+      throw new Error("idHint must be provided");
+    }
+
     // Default scope as per Tink documentation
     const defaultScope =
       "authorization:read,authorization:grant,credentials:refresh,credentials:read,credentials:write,providers:read,user:read";

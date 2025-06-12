@@ -6,6 +6,7 @@ import { tokenService } from "../services/tokenService";
 
 const tinkRoutes: FastifyPluginAsync = async (fastify) => {
   // Tink OAuth callback endpoint
+  // URL setup within Tink console
   fastify.get("/api/tink/callback", async (request, reply) => {
     try {
       const { code, state, error } = request.query as {

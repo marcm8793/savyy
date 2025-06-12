@@ -237,7 +237,7 @@ export class TinkService {
       requestBody.append("external_user_id", options.tinkUserId);
     }
 
-    // Add required id_hint - should be a human-readable identifier
+    // Add optional id_hint - should be a human-readable identifier
     // If not provided, use the user ID as fallback
     if (options.idHint) {
       requestBody.append("id_hint", options.idHint);

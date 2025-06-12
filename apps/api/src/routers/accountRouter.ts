@@ -165,7 +165,7 @@ export const accountRouter = router({
     .mutation(async ({ input, ctx }) => {
       try {
         const userId = ctx.user.id;
-        const idHint = ctx.user.name;
+        const idHint = ctx.user.name || ctx.user.email || userId;
 
         // Step 1: Check if we already have tink_user_id, if not create user in Tink
         let storedTinkUserId = await userService.getTinkUserId(ctx.db, userId);

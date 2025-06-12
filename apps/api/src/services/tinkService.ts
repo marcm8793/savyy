@@ -211,7 +211,7 @@ export class TinkService {
       userId?: string; // Tink's internal user_id (rarely used)
       tinkUserId?: string; // Our external_user_id (commonly used)
       scope?: string;
-      idHint?: string;
+      idHint: string;
     }
   ): Promise<TinkGrantUserAccessResponse> {
     // Validate that either userId (Tink internal) or tinkUserId (external) is provided
@@ -237,11 +237,7 @@ export class TinkService {
       requestBody.append("external_user_id", options.tinkUserId);
     }
 
-    // Add optional id_hint - should be a human-readable identifier
-    // If not provided, use the user ID as fallback
-    if (options.idHint) {
-      requestBody.append("id_hint", options.idHint);
-    }
+    requestBody.append("id_hint", options.idHint);
 
     const response = await fetch(
       `${this.baseUrl}/api/v1/oauth/authorization-grant/delegate`,

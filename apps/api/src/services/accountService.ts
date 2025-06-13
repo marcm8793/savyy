@@ -1,4 +1,3 @@
-// TODO: Remove this file
 import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { bankAccount, schema } from "../../db/schema";

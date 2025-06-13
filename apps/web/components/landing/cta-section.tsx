@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, CheckCircle } from "lucide-react";
+import Link from "next/link";
 
 const benefits = [
   "Connect all your financial accounts",
@@ -44,11 +45,14 @@ export default function CTASection() {
           {/* CTA Buttons */}
           <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Button
+              asChild
               size="lg"
               className="bg-white text-orange-600 hover:bg-orange-50 px-8 py-4 text-lg font-semibold shadow-lg border-0"
             >
-              Start Tracking Assets
-              <ArrowRight className="ml-2 h-5 w-5" />
+              <Link href="/signup" className="flex items-center">
+                Start Tracking Assets
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
             </Button>
             <Button
               variant="outline"

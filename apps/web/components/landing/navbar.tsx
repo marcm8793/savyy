@@ -17,6 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ModeToggle } from "../themes/mode-toggle";
+import Link from "next/link";
 
 // Navigation links array to be used in both desktop and mobile menus
 const navigationLinks = [
@@ -77,6 +78,7 @@ export default function Navbar() {
           <Popover>
             <PopoverTrigger asChild>
               <Button
+                aria-label="Open navigation menu"
                 className="group size-8 md:hidden"
                 variant="ghost"
                 size="icon"
@@ -162,9 +164,9 @@ export default function Navbar() {
           </Popover>
           {/* Main nav */}
           <div className="flex items-center gap-6">
-            <a href="#" className="text-primary hover:text-primary/90">
+            <Link href="/" className="text-primary hover:text-primary/90">
               <Logo />
-            </a>
+            </Link>
             {/* Navigation menu */}
             <NavigationMenu className="max-md:hidden">
               <NavigationMenuList className="gap-2">
@@ -264,14 +266,14 @@ export default function Navbar() {
         <div className="flex items-center gap-2">
           <ModeToggle />
           <Button asChild variant="ghost" size="sm" className="text-sm">
-            <a href="/signin">Sign In</a>
+            <Link href="/signin">Sign In</Link>
           </Button>
           <Button
             asChild
             size="sm"
             className="text-sm bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white border-0"
           >
-            <a href="/signup">Get Started</a>
+            <Link href="/signup">Get Started</Link>
           </Button>
         </div>
       </div>

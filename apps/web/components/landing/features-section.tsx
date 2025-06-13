@@ -106,11 +106,11 @@ export default function FeaturesSection() {
 
         {/* Features grid */}
         <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature, index) => {
+          {features.map((feature) => {
             const Icon = feature.icon;
             return (
               <div
-                key={index}
+                key={feature.title}
                 className="group relative rounded-2xl border border-border bg-card p-8 hover:border-orange-200 dark:hover:border-orange-800 hover:shadow-lg transition-all duration-300"
               >
                 <div

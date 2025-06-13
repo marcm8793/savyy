@@ -104,14 +104,14 @@ export default function Footer() {
           </div>
 
           <div className="grid grid-cols-2 gap-6 md:col-span-3 md:grid-cols-4">
-            {links.map((link, index) => (
-              <div key={index} className="space-y-4 text-sm">
+            {links.map((link) => (
+              <div key={link.group} className="space-y-4 text-sm">
                 <span className="block font-medium text-foreground">
                   {link.group}
                 </span>
-                {link.items.map((item, index) => (
+                {link.items.map((item) => (
                   <Link
-                    key={index}
+                    key={item.href}
                     href={item.href}
                     className="block text-muted-foreground duration-150 hover:text-orange-600 dark:hover:text-orange-400"
                   >

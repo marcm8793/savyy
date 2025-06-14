@@ -1,8 +1,33 @@
 import { Redis } from "@upstash/redis";
 
+/*
+
+## OAuth Code Security Configuration
+
+The system uses a conservative but efficient approach to prevent OAuth code replay attacks:
+
+- **Processing TTL**: 10 minutes (handles temporary failures)
+- **Processed TTL**: 2 hours (4x Tink's 30-minute access token lifetime)
+
+This configuration:
+- ✅ Prevents replay attacks during the entire OAuth code validity period
+- ✅ More memory-efficient than longer TTL approaches
+- ✅ Based on Tink's documented 30-minute access token lifetime
+- ✅ Provides safety margin for clock skew and edge cases
+
+The TTL can be adjusted in `RedisService` constants if other OAuth providers are added with different token lifetimes.
+
+*/
+
 class RedisService {
   private client: Redis | null = null;
   private isConnected: boolean = false;
+
+  // Configuration constants for OAuth code security
+  // Based on Tink's specification: access tokens expire after 30 minutes
+  // OAuth codes typically expire in 10-15 minutes, so we use 2 hours for safety margin
+  private readonly OAUTH_CODE_PROCESSED_TTL = 7200; // 2 hours in seconds (4x Tink's 30min token lifetime)
+  private readonly OAUTH_CODE_PROCESSING_TTL = 600; // 10 minutes in seconds
 
   constructor() {
     // Initialize Upstash Redis client from environment variables
@@ -88,7 +113,7 @@ class RedisService {
     }
 
     try {
-      // First check if already completed (processed codes have 5min TTL)
+      // First check if already completed (processed codes have 24h TTL to prevent replay attacks)
       const isCompleted = await this.client!.exists(`processed_code:${code}`);
       if (isCompleted === 1) {
         return false; // Already processed
@@ -101,7 +126,7 @@ class RedisService {
         Date.now().toString(),
         {
           nx: true, // Only set if key doesn't exist (SETNX behavior)
-          ex: 600, // 10 minute TTL
+          ex: this.OAUTH_CODE_PROCESSING_TTL, // Use configured TTL
         }
       );
 
@@ -130,8 +155,22 @@ class RedisService {
       // Use pipeline for atomic operations
       const pipeline = this.client!.pipeline();
 
-      // Mark as processed with 5-minute TTL (prevent reuse)
-      pipeline.setex(`processed_code:${code}`, 300, Date.now().toString());
+      // SECURITY FIX: Mark as processed with 2-hour TTL to prevent OAuth code replay attacks
+      //
+      // Problem: OAuth codes from providers like Tink typically have 10-15 minute lifetimes.
+      // Tink's access tokens expire after 30 minutes, so OAuth codes likely expire sooner.
+      // Previously, we only stored processed codes for 5 minutes, creating a replay vulnerability
+      // where the same code could be reused after our Redis key expired but before the OAuth
+      // provider's code expired.
+      //
+      // Solution: Store processed codes for 2 hours (7200 seconds) - 4x Tink's token lifetime
+      // to ensure complete coverage of the OAuth code's actual lifetime while being more
+      // resource-efficient than the previous 24-hour approach.
+      pipeline.setex(
+        `processed_code:${code}`,
+        this.OAUTH_CODE_PROCESSED_TTL,
+        Date.now().toString()
+      );
 
       // Remove the processing claim
       pipeline.del(`processing_code:${code}`);

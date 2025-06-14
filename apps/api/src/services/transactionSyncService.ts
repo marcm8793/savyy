@@ -135,6 +135,11 @@ export class TransactionSyncService {
       //TODO: Possible credentials mis-mapping
       // refreshCredentialsWithAuthToken is invoked with tinkAccountId, but the Tink endpoint expects a credentials ID, not an account ID. If those IDs differ, refresh will 404 and silently fall back to stale data.
       // 3. Optionally refresh credentials to get fresher data
+      //       Credentials refresh is called with an account ID, not credentials ID.
+      // refreshCredentialsWithAuthToken(tinkAccountId, …) passes a bank‐account ID to the /credentials/:id/refresh endpoint, which expects credentialsId.
+      // Result: 404 → stale data despite “success” log.
+
+      // Pass the correct credentialsId (often available on the bankAccount row) or map account → credentials before calling.
       if (!skipCredentialsRefresh) {
         try {
           // Try to refresh credentials with authorization grant token

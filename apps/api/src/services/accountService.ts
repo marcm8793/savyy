@@ -18,7 +18,7 @@ export const accountService = {
       .where(eq(bankAccount.userId, userId));
 
     // Apply pagination if provided
-    if (options?.limit && options?.offset) {
+    if (options?.limit !== undefined && options?.offset !== undefined) {
       return await baseQuery.limit(options.limit).offset(options.offset);
     } else if (options?.limit) {
       return await baseQuery.limit(options.limit);

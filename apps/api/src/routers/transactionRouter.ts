@@ -372,6 +372,11 @@ export const transactionRouter = router({
           .limit(input.pageSize);
 
         // Calculate next page token (simplified - in production, use cursor-based pagination)
+        //  TODO               pageToken parameter never used
+        // Clients can pass pageToken, but the query always starts from the top and generates a new token.
+        // his causes duplicate pages and prevents forward navigation.
+        // Implement seek pagination (e.g. WHERE booked_date < :lastBooked OR (booked_date = :lastBooked AND id < :lastId))
+        // or remove the pageToken field for now.
         const hasMore = transactions.length === input.pageSize;
         const nextPageToken = hasMore
           ? Buffer.from(
@@ -502,9 +507,11 @@ export const transactionRouter = router({
               to: new Date().toISOString().split("T")[0],
             };
 
-            // Fetch all transactions with pagination
-            const allTransactions: TinkTransaction[] = [];
+            // Process transactions page-by-page to avoid memory issues
             let nextPageToken: string | undefined;
+            let accountCreated = 0;
+            let accountUpdated = 0;
+            let accountErrors = 0;
 
             do {
               const response = await fetchTinkTransactions(
@@ -519,16 +526,25 @@ export const transactionRouter = router({
                 }
               );
 
-              allTransactions.push(...response.transactions);
+              // Process this page immediately
+              const pageResult = await storeTransactionsWithUpsert(
+                db,
+                user.id,
+                response.transactions
+              );
+
+              accountCreated += pageResult.created;
+              accountUpdated += pageResult.updated;
+              accountErrors += pageResult.errors;
+
               nextPageToken = response.nextPageToken;
             } while (nextPageToken);
 
-            // Store transactions with upsert strategy
-            const result = await storeTransactionsWithUpsert(
-              db,
-              user.id,
-              allTransactions
-            );
+            const result = {
+              created: accountCreated,
+              updated: accountUpdated,
+              errors: accountErrors,
+            };
 
             totalCreated += result.created;
             totalUpdated += result.updated;

@@ -5,7 +5,7 @@ import { tinkService } from "../services/tinkService";
 import { AccountsAndBalancesService } from "../services/accountsAndBalancesService";
 import { TransactionSyncService } from "../services/transactionSyncService";
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { bankAccount } from "../../db/schema.js";
 import { tokenService } from "../services/tokenService";
 import { userService } from "../services/userService";
@@ -268,21 +268,26 @@ export const accountRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        // Get the bank account and verify it belongs to the user
+        // Get the specific bank account and verify it belongs to the user
         const accounts = await ctx.db
           .select()
           .from(bankAccount)
-          .where(eq(bankAccount.userId, ctx.user.id));
+          .where(
+            and(
+              eq(bankAccount.userId, ctx.user.id),
+              eq(bankAccount.tinkAccountId, input.accountId)
+            )
+          )
+          .limit(1);
 
-        const account = accounts.find(
-          (acc) => acc.tinkAccountId === input.accountId
-        );
-        if (!account) {
+        if (accounts.length === 0) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Bank account not found",
           });
         }
+
+        const account = accounts[0];
 
         if (!account.accessToken) {
           throw new TRPCError({

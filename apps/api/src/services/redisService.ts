@@ -63,7 +63,7 @@ class RedisService {
     try {
       const [isCompleted, isProcessing] = await Promise.all([
         this.client.exists(`processed_code:${code}`),
-        this.client.sismember("processing_codes", code),
+        this.client.exists(`processing_code:${code}`),
       ]);
 
       return isCompleted === 1 || isProcessing === 1;
@@ -88,27 +88,25 @@ class RedisService {
     }
 
     try {
-      // Atomically claim the code using pipeline
-      const results = await this.client!.pipeline()
-        .exists(`processed_code:${code}`)
-        .sadd("processing_codes", code)
-        .exec();
-
-      // Extract results with proper typing
-      const isCompleted = (results[0] as unknown as [unknown, number])[1];
-      const added = (results[1] as unknown as [unknown, number])[1];
-
-      if (isCompleted === 1 || added === 0) {
-        // already processed or someone else just claimed it
-        return false;
+      // First check if already completed (processed codes have 5min TTL)
+      const isCompleted = await this.client!.exists(`processed_code:${code}`);
+      if (isCompleted === 1) {
+        return false; // Already processed
       }
-      await this.client!.setex(
-        `processing_start:${code}`,
-        600,
-        Date.now().toString()
-      ); // 10 min TTL
 
-      return true;
+      // Atomically claim the code using SETNX with TTL (10 minutes)
+      // This is truly atomic - only one worker can successfully set this key
+      const claimed = await this.client!.set(
+        `processing_code:${code}`,
+        Date.now().toString(),
+        {
+          nx: true, // Only set if key doesn't exist (SETNX behavior)
+          ex: 600, // 10 minute TTL
+        }
+      );
+
+      // claimed will be "OK" if successful, null if key already exists
+      return claimed === "OK";
     } catch (error) {
       console.error(
         "Error marking code as processing:",
@@ -135,9 +133,8 @@ class RedisService {
       // Mark as processed with 5-minute TTL (prevent reuse)
       pipeline.setex(`processed_code:${code}`, 300, Date.now().toString());
 
-      // Remove from processing set and cleanup start timestamp
-      pipeline.srem("processing_codes", code);
-      pipeline.del(`processing_start:${code}`);
+      // Remove the processing claim
+      pipeline.del(`processing_code:${code}`);
 
       await pipeline.exec();
     } catch (error) {
@@ -159,11 +156,8 @@ class RedisService {
     }
 
     try {
-      // Remove from processing set and cleanup start timestamp
-      const pipeline = this.client!.pipeline();
-      pipeline.srem("processing_codes", code);
-      pipeline.del(`processing_start:${code}`);
-      await pipeline.exec();
+      // Remove the processing claim
+      await this.client!.del(`processing_code:${code}`);
     } catch (error) {
       console.error(
         "Error removing code from processing:",
@@ -212,12 +206,11 @@ class RedisService {
     }
 
     try {
-      const processingCount = await this.client!.scard("processing_codes");
-
-      // Note: Can't easily count processed codes due to TTL, but could implement if needed
+      // Note: Can't easily count processing codes without scanning all keys
+      // This is a limitation of the new atomic approach, but the trade-off is worth it
       return {
         processedCodes: -1, // Not tracked due to TTL
-        processingCodes: processingCount,
+        processingCodes: -1, // Not easily trackable with individual keys
       };
     } catch (error) {
       console.error(
@@ -225,84 +218,6 @@ class RedisService {
         error instanceof Error ? error.message : String(error)
       );
       return { processedCodes: 0, processingCodes: 0 };
-    }
-  }
-
-  /**
-   * Clean up stuck processing codes (codes that have been processing too long)
-   */
-  async cleanupProcessingCodes(): Promise<void> {
-    if (!this.isRedisAvailable()) {
-      return;
-    }
-
-    try {
-      // Get all processing codes
-      const processingCodes = await this.client!.smembers("processing_codes");
-
-      if (processingCodes.length === 0) {
-        return;
-      }
-
-      const now = Date.now();
-      // TODO: Make this configurable
-      //       Ensure consistency with the hardcoded timeout value.
-      // This hardcoded value should match the TTL set in markCodeAsProcessing. Consider using the same configurable constant suggested earlier.
-
-      // -      const maxProcessingTime = 10 * 60 * 1000; // 10 minutes
-      // +      const maxProcessingTime = this.PROCESSING_TIMEOUT_SECONDS * 1000;
-      const maxProcessingTime = 10 * 60 * 1000; // 10 minutes
-      const codesToRemove: string[] = [];
-
-      // Check each processing code
-      for (const code of processingCodes) {
-        try {
-          const startTime = await this.client!.get(`processing_start:${code}`);
-
-          if (!startTime || typeof startTime !== "string") {
-            // No start time found - this code is orphaned, remove it
-            codesToRemove.push(code);
-            continue;
-          }
-
-          const parsed = Number.parseInt(startTime, 10);
-
-          if (Number.isNaN(parsed) || now - parsed > maxProcessingTime) {
-            // Code has been processing too long - it's stuck
-            codesToRemove.push(code);
-          }
-        } catch {
-          // If we can't check this code, consider it orphaned
-          console.warn(
-            `Failed to check processing time for code ${code.substring(
-              0,
-              8
-            )}...`
-          );
-          codesToRemove.push(code);
-        }
-      }
-
-      // Remove stuck codes in batch
-      if (codesToRemove.length > 0) {
-        const pipeline = this.client!.pipeline();
-
-        for (const code of codesToRemove) {
-          pipeline.srem("processing_codes", code);
-          pipeline.del(`processing_start:${code}`);
-        }
-
-        await pipeline.exec();
-
-        console.log(
-          `Cleaned up ${codesToRemove.length} stuck processing codes (processing >10min or orphaned)`
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Error cleaning up processing codes:",
-        error instanceof Error ? error.message : String(error)
-      );
     }
   }
 }

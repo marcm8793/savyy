@@ -73,7 +73,7 @@ export class HttpRetryUtil {
    */
   async fetchWithRetry(
     url: string,
-    options: RequestInit,
+    options: RequestInit = {},
     context: string = "HTTP request"
   ): Promise<Response> {
     let lastError: Error | null = null;

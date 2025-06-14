@@ -208,32 +208,32 @@ export class AccountsAndBalancesService {
   }
 
   /**
-   * Get stored accounts and balances from database for a user
+   * Get stored accounts from database with pagination support
+   * Consolidated from accountService.ts
    */
-  async getStoredAccountsAndBalancesFromDb(
+  async getAccountsFromDb(
     db: NodePgDatabase<typeof schema>,
-    userId: string
+    userId: string,
+    options?: {
+      limit?: number;
+      offset?: number;
+    }
   ): Promise<BankAccount[]> {
-    console.log("Fetching stored accounts and balances for user:", userId);
-
-    const accounts = await db
+    const baseQuery = db
       .select()
       .from(bankAccount)
       .where(eq(bankAccount.userId, userId));
 
-    console.log("Retrieved stored accounts:", {
-      userId,
-      accountCount: accounts.length,
-      accounts: accounts.map((acc) => ({
-        id: acc.id,
-        accountName: acc.accountName,
-        balance: acc.balance,
-        currency: acc.currency,
-        lastRefreshed: acc.lastRefreshed,
-      })),
-    });
+    // Apply pagination if provided
+    if (options?.limit !== undefined && options?.offset !== undefined) {
+      return await baseQuery.limit(options.limit).offset(options.offset);
+    } else if (options?.limit) {
+      return await baseQuery.limit(options.limit);
+    } else if (options?.offset) {
+      return await baseQuery.offset(options.offset);
+    }
 
-    return accounts;
+    return await baseQuery;
   }
 
   /**
@@ -361,7 +361,7 @@ export class AccountsAndBalancesService {
     accountCount: number;
     lastRefreshed: Date | null;
   }> {
-    const accounts = await this.getStoredAccountsAndBalancesFromDb(db, userId);
+    const accounts = await this.getAccountsFromDb(db, userId);
 
     const totalBalance = accounts.reduce((sum, account) => {
       const balance = account.balance ? parseFloat(account.balance) : 0;

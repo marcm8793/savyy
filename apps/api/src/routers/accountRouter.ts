@@ -1,22 +1,24 @@
 import { z } from "zod/v4";
 import { router, protectedProcedure } from "../trpc";
-import { accountService } from "../services/accountService";
 import { tinkService } from "../services/tinkService";
-import { AccountsAndBalancesService } from "../services/accountsAndBalancesService";
 import { TransactionSyncService } from "../services/transactionSyncService";
 import { TRPCError } from "@trpc/server";
 import { eq, and } from "drizzle-orm";
-import { bankAccount } from "../../db/schema.js";
+import { bankAccount } from "../../db/schema";
 import { tokenService } from "../services/tokenService";
 import { userService } from "../services/userService";
 import { createSelectSchema } from "drizzle-zod";
+import { AccountsAndBalancesService } from "../services/accountsAndBalancesService";
 
-// Use drizzle-zod with custom refinements for the balance field
-// This approach uses the createSelectSchema with refinements as shown in the official docs
-// TODO: check if this is needed
 const bankAccountSchema = createSelectSchema(bankAccount, {
   balance: (schema) =>
-    schema.transform((val) => (val ? parseFloat(val) : null)),
+    schema.transform((val) => {
+      if (val === null || val === undefined) {
+        return null;
+      }
+      const parsed = typeof val === "string" ? parseFloat(val) : val;
+      return isNaN(parsed) ? null : parsed;
+    }),
 });
 
 export const accountRouter = router({
@@ -31,14 +33,16 @@ export const accountRouter = router({
     .output(z.array(bankAccountSchema))
     .query(async ({ ctx, input }) => {
       try {
-        const accounts = await accountService.getAccountsFromDb(
-          ctx.db,
-          ctx.user.id,
-          {
-            limit: input.limit,
-            offset: input.offset,
-          }
-        );
+        const accounts =
+          await new AccountsAndBalancesService().getAccountsFromDb(
+            ctx.db,
+            ctx.user.id,
+            {
+              limit: input.limit,
+              offset: input.offset,
+            }
+          );
+
         ctx.req.server.log.debug(
           {
             userId: ctx.user.id,
@@ -48,9 +52,10 @@ export const accountRouter = router({
           },
           "Fetched accounts with pagination"
         );
+
         return accounts;
       } catch (error) {
-        ctx.req.server.log.error("Failed to fetch accounts:", error);
+        ctx.req.server.log.error({ error }, "Failed to fetch accounts");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to fetch accounts",
@@ -69,7 +74,7 @@ export const accountRouter = router({
     )
     .output(
       z.object({
-        url: z.string(),
+        url: z.url(),
         message: z.string(),
       })
     )
@@ -103,22 +108,26 @@ export const accountRouter = router({
 
               storedTinkUserId = tinkUserResponse.user_id;
 
-              ctx.req.server.log.debug("User created successfully in Tink", {
-                tinkUserId: tinkUserResponse.user_id,
-                externalUserId: tinkUserResponse.external_user_id,
-              });
+              ctx.req.server.log.debug(
+                {
+                  tinkUserId: tinkUserResponse.user_id,
+                  externalUserId: tinkUserResponse.external_user_id,
+                },
+                "User created successfully in Tink"
+              );
             } else {
               ctx.req.server.log.warn(
-                "Tink user created but no user_id returned",
                 {
                   response: tinkUserResponse,
-                }
+                },
+                "Tink user created but no user_id returned"
               );
             }
           } catch (error) {
             // Check if user already exists (this is expected for returning users)
             const errorMessage =
               error instanceof Error ? error.message : String(error);
+
             if (
               errorMessage.includes("user_with_external_user_id_already_exists")
             ) {
@@ -129,15 +138,19 @@ export const accountRouter = router({
               // The authorization should still work with external_user_id
             } else {
               ctx.req.server.log.warn(
-                "Unexpected error creating user in Tink:",
-                error
+                { error },
+                "Unexpected error creating user in Tink"
               );
+              // Consider whether to throw here or continue
             }
           }
         } else {
-          ctx.req.server.log.debug("User already has tink_user_id stored", {
-            tinkUserId: storedTinkUserId,
-          });
+          ctx.req.server.log.debug(
+            {
+              tinkUserId: storedTinkUserId,
+            },
+            "User already has tink_user_id stored"
+          );
         }
 
         // Step 2: Get authorization grant token
@@ -173,8 +186,8 @@ export const accountRouter = router({
         };
       } catch (error) {
         ctx.req.server.log.error(
-          "Failed to get secure Tink connection URL:",
-          error
+          { error },
+          "Failed to get secure Tink connection URL"
         );
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -213,10 +226,13 @@ export const accountRouter = router({
           tokenResponse.expires_in
         );
 
-        ctx.req.server.log.info("Accounts synced successfully:", {
-          userId: ctx.user.id,
-          accountCount: syncResult.count,
-        });
+        ctx.req.server.log.info(
+          {
+            userId: ctx.user.id,
+            accountCount: syncResult.count,
+          },
+          "Accounts synced successfully"
+        );
 
         return {
           message:
@@ -225,11 +241,12 @@ export const accountRouter = router({
           count: syncResult.count,
         };
       } catch (error) {
-        ctx.req.server.log.error("Failed to sync Tink accounts:", error);
+        ctx.req.server.log.error({ error }, "Failed to sync Tink accounts");
 
         // Handle specific Tink errors
         const errorMessage =
           error instanceof Error ? error.message : String(error);
+
         if (errorMessage.includes("INVALID_STATE_DUPLICATE_CREDENTIALS")) {
           throw new TRPCError({
             code: "CONFLICT",
@@ -318,11 +335,25 @@ export const accountRouter = router({
           }
         );
 
+        const message = syncResult.success
+          ? `Successfully synced ${syncResult.transactionsCreated} new transactions and updated ${syncResult.transactionsUpdated} existing ones.`
+          : `Sync completed with errors. ${syncResult.errors.length} errors occurred.`;
+
+        ctx.req.server.log.info(
+          {
+            userId: ctx.user.id,
+            accountId: input.accountId,
+            success: syncResult.success,
+            transactionsCreated: syncResult.transactionsCreated,
+            transactionsUpdated: syncResult.transactionsUpdated,
+            errorCount: syncResult.errors.length,
+          },
+          "Transaction sync completed"
+        );
+
         return {
           success: syncResult.success,
-          message: syncResult.success
-            ? `Successfully synced ${syncResult.transactionsCreated} new transactions and updated ${syncResult.transactionsUpdated} existing ones.`
-            : `Sync completed with errors. ${syncResult.errors.length} errors occurred.`,
+          message,
           transactionsCreated: syncResult.transactionsCreated,
           transactionsUpdated: syncResult.transactionsUpdated,
           totalTransactionsFetched: syncResult.totalTransactionsFetched,
@@ -333,7 +364,10 @@ export const accountRouter = router({
           throw error;
         }
 
-        ctx.req.server.log.error("Failed to sync account transactions:", error);
+        ctx.req.server.log.error(
+          { error },
+          "Failed to sync account transactions"
+        );
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to sync transactions",

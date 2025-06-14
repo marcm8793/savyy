@@ -1,17 +1,19 @@
-import { FastifyPluginAsync } from 'fastify';
-import { auth } from '../utils/auth';
+import { FastifyPluginAsync } from "fastify";
+import { auth } from "../utils/auth";
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.route({
-    method: ['GET', 'POST'],
-    url: '/api/auth/*',
+    method: ["GET", "POST"],
+    url: "/api/auth/*",
     async handler(request, reply) {
       try {
         const url = new URL(request.url, `http://${request.headers.host}`);
 
         const headers = new Headers();
         Object.entries(request.headers).forEach(([key, value]) => {
-          if (value) {headers.append(key, value.toString());}
+          if (value) {
+            headers.append(key, value.toString());
+          }
         });
 
         const req = new Request(url.toString(), {
@@ -26,10 +28,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         response.headers.forEach((value, key) => reply.header(key, value));
         reply.send(response.body ? await response.text() : null);
       } catch (error) {
-        fastify.log.error('Authentication Error:', error);
+        fastify.log.error("Authentication Error:", error);
         reply.status(500).send({
-          error: 'Internal authentication error',
-          code: 'AUTH_FAILURE',
+          error: "Internal authentication error",
+          code: "AUTH_FAILURE",
         });
       }
     },

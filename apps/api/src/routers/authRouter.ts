@@ -16,9 +16,9 @@ export const signUpSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
 });
 
-// Define authentication router
+// * Define authentication router
 export const authRouter = router({
-  // Sign in procedure - handles authentication through Better Auth
+  // * Sign in procedure - handles authentication through Better Auth
   signIn: publicProcedure
     .input(signInSchema)
     .mutation(async ({ input, ctx }) => {
@@ -33,7 +33,7 @@ export const authRouter = router({
       };
     }),
 
-  // Sign up procedure - similar to sign in, for validation and consistency
+  // * Sign up procedure - similar to sign in, for validation and consistency
   signUp: publicProcedure
     .input(signUpSchema)
     .mutation(async ({ input, ctx }) => {
@@ -48,7 +48,7 @@ export const authRouter = router({
       };
     }),
 
-  // Get current session - public procedure that returns user if authenticated
+  // * Get current session - public procedure that returns user if authenticated
   getSession: publicProcedure.query(async ({ ctx }) => {
     return {
       user: ctx.user,
@@ -57,7 +57,7 @@ export const authRouter = router({
     };
   }),
 
-  // Get user profile - protected procedure (requires authentication)
+  // * Get user profile - protected procedure (requires authentication)
   getProfile: protectedProcedure.query(async ({ ctx }) => {
     // ctx.user and ctx.session are guaranteed to be non-null here
     return {
@@ -69,7 +69,7 @@ export const authRouter = router({
     };
   }),
 
-  // Update user profile - protected procedure
+  // * Update user profile - protected procedure
   updateProfile: protectedProcedure
     .input(
       z.object({
@@ -91,7 +91,7 @@ export const authRouter = router({
       };
     }),
 
-  // Delete account - protected procedure
+  // * Delete account - protected procedure
   deleteAccount: protectedProcedure.mutation(async ({ ctx }) => {
     // Here you would delete the user account
     // ctx.user is guaranteed to be non-null

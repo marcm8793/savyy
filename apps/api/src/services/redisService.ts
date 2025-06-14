@@ -88,18 +88,20 @@ class RedisService {
     }
 
     try {
-      // Check if already processed or processing
-      const [isCompleted, isProcessing] = await Promise.all([
-        this.client!.exists(`processed_code:${code}`),
-        this.client!.sismember("processing_codes", code),
-      ]);
+      // Atomically claim the code using pipeline
+      const results = await this.client!.pipeline()
+        .exists(`processed_code:${code}`)
+        .sadd("processing_codes", code)
+        .exec();
 
-      if (isCompleted === 1 || isProcessing === 1) {
-        return false; // Already processed or processing
+      // Extract results with proper typing
+      const isCompleted = (results[0] as unknown as [unknown, number])[1];
+      const added = (results[1] as unknown as [unknown, number])[1];
+
+      if (isCompleted === 1 || added === 0) {
+        // already processed or someone else just claimed it
+        return false;
       }
-
-      // Mark as processing with start timestamp
-      await this.client!.sadd("processing_codes", code);
       await this.client!.setex(
         `processing_start:${code}`,
         600,
@@ -257,9 +259,9 @@ class RedisService {
             continue;
           }
 
-          const processingDuration = now - parseInt(startTime);
+          const parsed = Number.parseInt(startTime, 10);
 
-          if (processingDuration > maxProcessingTime) {
+          if (Number.isNaN(parsed) || now - parsed > maxProcessingTime) {
             // Code has been processing too long - it's stuck
             codesToRemove.push(code);
           }

@@ -1,5 +1,5 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { schema, bankAccount, transaction } from "../../db/schema";
 import { TinkService } from "./tinkService";
 
@@ -348,7 +348,8 @@ export class TransactionSyncService {
   }
 
   /**
-   * Store transactions with upsert strategy to handle duplicates
+   * Store transactions with bulk upsert strategy to handle duplicates
+   * Uses PostgreSQL's ON CONFLICT to eliminate N+1 query pattern
    */
   private async storeTransactionsWithUpsert(
     db: NodePgDatabase<typeof schema>,
@@ -356,87 +357,93 @@ export class TransactionSyncService {
     bankAccountId: number,
     tinkTransactions: TinkTransaction[]
   ): Promise<{ created: number; updated: number; errors: string[] }> {
-    let created = 0;
-    let updated = 0;
     const errors: string[] = [];
 
     // Process in batches for better performance
     const BATCH_SIZE = 50;
+    let totalCreated = 0;
+    let totalUpdated = 0;
 
     for (let i = 0; i < tinkTransactions.length; i += BATCH_SIZE) {
       const batch = tinkTransactions.slice(i, i + BATCH_SIZE);
 
       try {
         await db.transaction(async (tx) => {
-          for (const tinkTx of batch) {
-            try {
-              // Check if transaction already exists
-              const existing = await tx
-                .select({ id: transaction.id })
-                .from(transaction)
-                .where(eq(transaction.tinkTransactionId, tinkTx.id))
-                .limit(1);
+          // Prepare batch data for bulk upsert
+          const batchData = batch.map((tinkTx) => ({
+            userId,
+            tinkTransactionId: tinkTx.id,
+            tinkAccountId: tinkTx.accountId,
+            bankAccountId,
+            amount: tinkTx.amount.value.unscaledValue,
+            amountScale: parseInt(tinkTx.amount.value.scale) || 0,
+            currencyCode: tinkTx.amount.currencyCode,
+            bookedDate: tinkTx.dates.booked,
+            valueDate: tinkTx.dates.value || tinkTx.dates.booked,
+            status: tinkTx.status,
+            displayDescription: (tinkTx.descriptions.display ?? "").substring(
+              0,
+              500
+            ),
+            originalDescription: (tinkTx.descriptions.original ?? "").substring(
+              0,
+              500
+            ),
+            providerTransactionId:
+              tinkTx.identifiers?.providerTransactionId?.substring(0, 255),
+            merchantName: tinkTx.merchantInformation?.merchantName?.substring(
+              0,
+              255
+            ),
+            merchantCategoryCode:
+              tinkTx.merchantInformation?.merchantCategoryCode?.substring(
+                0,
+                10
+              ),
+            categoryId: tinkTx.categories?.pfm?.id?.substring(0, 255),
+            categoryName: tinkTx.categories?.pfm?.name?.substring(0, 255),
+            transactionType: tinkTx.types?.type?.substring(0, 50),
+            financialInstitutionTypeCode:
+              tinkTx.types?.financialInstitutionTypeCode?.substring(0, 10),
+            reference: tinkTx.reference?.substring(0, 255),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }));
 
-              const transactionData = {
-                userId,
-                tinkTransactionId: tinkTx.id,
-                tinkAccountId: tinkTx.accountId,
-                bankAccountId,
-                amount: tinkTx.amount.value.unscaledValue,
-                amountScale: parseInt(tinkTx.amount.value.scale) || 0,
-                currencyCode: tinkTx.amount.currencyCode,
-                bookedDate: tinkTx.dates.booked,
-                valueDate: tinkTx.dates.value || tinkTx.dates.booked,
-                status: tinkTx.status,
-                displayDescription: tinkTx.descriptions.display.substring(
-                  0,
-                  500
-                ),
-                originalDescription: tinkTx.descriptions.original.substring(
-                  0,
-                  500
-                ),
-                providerTransactionId:
-                  tinkTx.identifiers?.providerTransactionId?.substring(0, 255),
-                merchantName:
-                  tinkTx.merchantInformation?.merchantName?.substring(0, 255),
-                merchantCategoryCode:
-                  tinkTx.merchantInformation?.merchantCategoryCode?.substring(
-                    0,
-                    10
-                  ),
-                categoryId: tinkTx.categories?.pfm?.id?.substring(0, 255),
-                categoryName: tinkTx.categories?.pfm?.name?.substring(0, 255),
-                transactionType: tinkTx.types?.type?.substring(0, 50),
-                financialInstitutionTypeCode:
-                  tinkTx.types?.financialInstitutionTypeCode?.substring(0, 10),
-                reference: tinkTx.reference?.substring(0, 255),
-                updatedAt: new Date(),
-              };
+          // Bulk upsert using ON CONFLICT - single query for entire batch
+          const result = await tx
+            .insert(transaction)
+            .values(batchData)
+            .onConflictDoUpdate({
+              target: transaction.tinkTransactionId,
+              set: {
+                status: sql`EXCLUDED.status`,
+                amount: sql`EXCLUDED.amount`,
+                amountScale: sql`EXCLUDED.amount_scale`,
+                displayDescription: sql`EXCLUDED.display_description`,
+                originalDescription: sql`EXCLUDED.original_description`,
+                merchantName: sql`EXCLUDED.merchant_name`,
+                merchantCategoryCode: sql`EXCLUDED.merchant_category_code`,
+                categoryId: sql`EXCLUDED.category_id`,
+                categoryName: sql`EXCLUDED.category_name`,
+                updatedAt: sql`EXCLUDED.updated_at`,
+              },
+            })
+            .returning({
+              id: transaction.id,
+              tinkTransactionId: transaction.tinkTransactionId,
+              createdAt: transaction.createdAt,
+              updatedAt: transaction.updatedAt,
+            });
 
-              if (existing.length > 0) {
-                // Update existing transaction (status might have changed from PENDING to BOOKED)
-                await tx
-                  .update(transaction)
-                  .set(transactionData)
-                  .where(eq(transaction.id, existing[0].id));
-                updated++;
-              } else {
-                // Create new transaction
-                await tx.insert(transaction).values({
-                  ...transactionData,
-                  createdAt: new Date(),
-                });
-                created++;
-              }
-            } catch (error) {
-              const errorMsg = `Error processing transaction ${tinkTx.id}: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`;
-              console.error(errorMsg);
-              errors.push(errorMsg);
-            }
-          }
+          // Count created vs updated based on timestamps
+          const batchCreated = result.filter(
+            (r) => r.createdAt.getTime() === r.updatedAt.getTime()
+          ).length;
+          const batchUpdated = result.length - batchCreated;
+
+          totalCreated += batchCreated;
+          totalUpdated += batchUpdated;
         });
       } catch (error) {
         const errorMsg = `Error processing batch starting at index ${i}: ${
@@ -447,7 +454,7 @@ export class TransactionSyncService {
       }
     }
 
-    return { created, updated, errors };
+    return { created: totalCreated, updated: totalUpdated, errors };
   }
 
   /**

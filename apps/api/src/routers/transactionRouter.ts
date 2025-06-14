@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
-import { eq, and, gte, lte, inArray, desc } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, desc, sql } from "drizzle-orm";
 import { transaction, bankAccount, schema } from "../../db/schema";
 
 import crypto from "crypto";
@@ -114,15 +114,15 @@ function verifyWebhookSignature(
   );
 }
 
-// Transaction storage with upsert strategy
+// Transaction storage with bulk upsert strategy to eliminate N+1 queries
 async function storeTransactionsWithUpsert(
   db: NodePgDatabase<typeof schema>,
   userId: string,
   tinkTransactions: TinkTransaction[]
 ): Promise<{ created: number; updated: number; errors: number }> {
-  let created = 0;
-  let updated = 0;
-  let errors = 0;
+  let totalCreated = 0;
+  let totalUpdated = 0;
+  let totalErrors = 0;
 
   // Process in batches for better performance
   const BATCH_SIZE = 50;
@@ -132,38 +132,40 @@ async function storeTransactionsWithUpsert(
 
     try {
       await db.transaction(async (tx: NodePgDatabase<typeof schema>) => {
-        for (const tinkTx of batch) {
-          try {
-            // Get bank account ID from tink account ID
-            const bankAccountResult = await tx
-              .select({ id: bankAccount.id })
-              .from(bankAccount)
-              .where(
-                and(
-                  eq(bankAccount.tinkAccountId, tinkTx.accountId),
-                  eq(bankAccount.userId, userId)
-                )
-              )
-              .limit(1);
+        // First, get all bank account IDs for this batch in a single query
+        const accountIds = [...new Set(batch.map((tx) => tx.accountId))];
+        const bankAccountMap = new Map<string, number>();
 
-            if (bankAccountResult.length === 0) {
+        const bankAccounts = await tx
+          .select({
+            tinkAccountId: bankAccount.tinkAccountId,
+            id: bankAccount.id,
+          })
+          .from(bankAccount)
+          .where(
+            and(
+              inArray(bankAccount.tinkAccountId, accountIds),
+              eq(bankAccount.userId, userId)
+            )
+          );
+
+        bankAccounts.forEach((acc) => {
+          bankAccountMap.set(acc.tinkAccountId, acc.id);
+        });
+
+        // Prepare batch data for bulk upsert, filtering out transactions without bank accounts
+        const batchData = batch
+          .map((tinkTx) => {
+            const bankAccountId = bankAccountMap.get(tinkTx.accountId);
+            if (!bankAccountId) {
               console.warn(
                 `Bank account not found for tinkAccountId: ${tinkTx.accountId}`
               );
-              errors++;
-              continue;
+              totalErrors++;
+              return null;
             }
 
-            const bankAccountId = bankAccountResult[0].id;
-
-            // Check if transaction already exists
-            const existing = await tx
-              .select({ id: transaction.id })
-              .from(transaction)
-              .where(eq(transaction.tinkTransactionId, tinkTx.id))
-              .limit(1);
-
-            const transactionData = {
+            return {
               userId,
               tinkTransactionId: tinkTx.id,
               tinkAccountId: tinkTx.accountId,
@@ -196,37 +198,58 @@ async function storeTransactionsWithUpsert(
               financialInstitutionTypeCode:
                 tinkTx.types?.financialInstitutionTypeCode?.substring(0, 10),
               reference: tinkTx.reference?.substring(0, 255),
+              createdAt: new Date(),
               updatedAt: new Date(),
             };
+          })
+          .filter((item): item is NonNullable<typeof item> => item !== null);
 
-            if (existing.length > 0) {
-              // Update existing transaction
-              await tx
-                .update(transaction)
-                .set(transactionData)
-                .where(eq(transaction.id, existing[0].id));
-              updated++;
-            } else {
-              // Create new transaction
-              await tx.insert(transaction).values({
-                ...transactionData,
-                createdAt: new Date(),
-              });
-              created++;
-            }
-          } catch (error) {
-            console.error(`Error processing transaction ${tinkTx.id}:`, error);
-            errors++;
-          }
+        if (batchData.length === 0) {
+          return; // Skip if no valid transactions in this batch
         }
+
+        // Bulk upsert using ON CONFLICT - single query for entire batch
+        const result = await tx
+          .insert(transaction)
+          .values(batchData)
+          .onConflictDoUpdate({
+            target: transaction.tinkTransactionId,
+            set: {
+              status: sql`EXCLUDED.status`,
+              amount: sql`EXCLUDED.amount`,
+              amountScale: sql`EXCLUDED.amount_scale`,
+              displayDescription: sql`EXCLUDED.display_description`,
+              originalDescription: sql`EXCLUDED.original_description`,
+              merchantName: sql`EXCLUDED.merchant_name`,
+              merchantCategoryCode: sql`EXCLUDED.merchant_category_code`,
+              categoryId: sql`EXCLUDED.category_id`,
+              categoryName: sql`EXCLUDED.category_name`,
+              updatedAt: sql`EXCLUDED.updated_at`,
+            },
+          })
+          .returning({
+            id: transaction.id,
+            tinkTransactionId: transaction.tinkTransactionId,
+            createdAt: transaction.createdAt,
+            updatedAt: transaction.updatedAt,
+          });
+
+        // Count created vs updated based on timestamps
+        const batchCreated = result.filter(
+          (r) => r.createdAt.getTime() === r.updatedAt.getTime()
+        ).length;
+        const batchUpdated = result.length - batchCreated;
+
+        totalCreated += batchCreated;
+        totalUpdated += batchUpdated;
       });
     } catch (error) {
       console.error(`Error processing batch starting at index ${i}:`, error);
-      errors += batch.length;
+      totalErrors += batch.length;
     }
   }
 
-  return { created, updated, errors };
+  return { created: totalCreated, updated: totalUpdated, errors: totalErrors };
 }
 
 // Fetch transactions from Tink API with pagination
@@ -743,15 +766,19 @@ export const transactionRouter = router({
           .from(transaction)
           .where(and(...conditions));
 
+        // Helper function to convert amount to real value considering scale
+        const toNumber = (t: (typeof transactions)[number]) =>
+          Number(t.amount) / 10 ** (t.amountScale ?? 0);
+
         // Calculate statistics
         const totalTransactions = transactions.length;
         const totalIncome = transactions
-          .filter((t) => parseFloat(t.amount) > 0)
-          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+          .filter((t) => toNumber(t) > 0)
+          .reduce((sum, t) => sum + toNumber(t), 0);
         const totalExpenses = Math.abs(
           transactions
-            .filter((t) => parseFloat(t.amount) < 0)
-            .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+            .filter((t) => toNumber(t) < 0)
+            .reduce((sum, t) => sum + toNumber(t), 0)
         );
 
         // Group by category
@@ -761,7 +788,7 @@ export const transactionRouter = router({
             acc[category] = { count: 0, amount: 0 };
           }
           acc[category].count++;
-          acc[category].amount += parseFloat(t.amount);
+          acc[category].amount += toNumber(t);
           return acc;
         }, {} as Record<string, { count: number; amount: number }>);
 

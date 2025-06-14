@@ -147,7 +147,7 @@ export const transactionService = {
     userId: string,
     filters?: Omit<TinkTransactionFilters, "accountIdIn">
   ) {
-    return this.getTransactions(db, userId, {
+    return transactionService.getTransactions(db, userId, {
       ...filters,
       accountIdIn: [accountId],
     });

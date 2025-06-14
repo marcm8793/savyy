@@ -210,7 +210,7 @@ export class AccountsAndBalancesService {
   /**
    * Get stored accounts and balances from database for a user
    */
-  async getStoredAccountsAndBalances(
+  async getStoredAccountsAndBalancesFromDb(
     db: NodePgDatabase<typeof schema>,
     userId: string
   ): Promise<BankAccount[]> {
@@ -361,7 +361,7 @@ export class AccountsAndBalancesService {
     accountCount: number;
     lastRefreshed: Date | null;
   }> {
-    const accounts = await this.getStoredAccountsAndBalances(db, userId);
+    const accounts = await this.getStoredAccountsAndBalancesFromDb(db, userId);
 
     const totalBalance = accounts.reduce((sum, account) => {
       const balance = account.balance ? parseFloat(account.balance) : 0;

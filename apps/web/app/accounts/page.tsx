@@ -31,7 +31,7 @@ export default function AccountsPage() {
     data: accounts,
     isLoading,
     refetch,
-  } = trpc.account.getAccounts.useQuery({
+  } = trpc.account.getAccountsFromDb.useQuery({
     limit: 50,
     offset: 0,
   });

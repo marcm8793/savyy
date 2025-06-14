@@ -1,19 +1,19 @@
-import { z } from 'zod';
-import { router, publicProcedure, protectedProcedure } from '../trpc';
+import { z } from "zod/v4";
+import { router, publicProcedure, protectedProcedure } from "../trpc";
 
 // Auth schemas - these should match the user table constraints
 // email: text().notNull().unique() -> string with email validation
 // name: text().notNull() -> string with minimum length
 // password: not in user table, stored in account table -> string with minimum length
 export const signInSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 export const signUpSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  name: z.string().min(2, "Name must be at least 2 characters"),
 });
 
 // Define authentication router
@@ -27,7 +27,7 @@ export const authRouter = router({
       // This is mainly for schema validation and can be used for additional logic
 
       return {
-        message: 'Sign in request validated',
+        message: "Sign in request validated",
         email: input.email,
         // Don't return the password for security
       };
@@ -41,7 +41,7 @@ export const authRouter = router({
       // The actual registration is handled by Better Auth through the auth client
 
       return {
-        message: 'Sign up request validated',
+        message: "Sign up request validated",
         email: input.email,
         name: input.name,
         // Don't return the password for security
@@ -75,7 +75,7 @@ export const authRouter = router({
       z.object({
         name: z.string().optional(),
         // Add other profile fields as needed
-      }),
+      })
     )
     .mutation(async ({ input, ctx }) => {
       // Here you would update the user in your database
@@ -85,7 +85,7 @@ export const authRouter = router({
       // await ctx.db.update(users).set(input).where(eq(users.id, ctx.user.id));
 
       return {
-        message: 'Profile updated successfully',
+        message: "Profile updated successfully",
         userId: ctx.user.id,
         updates: input,
       };
@@ -97,7 +97,7 @@ export const authRouter = router({
     // ctx.user is guaranteed to be non-null
 
     return {
-      message: 'Account deletion initiated',
+      message: "Account deletion initiated",
       userId: ctx.user.id,
     };
   }),

@@ -1,22 +1,52 @@
 import { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { tinkService } from "../services/tinkService";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { AccountsAndBalancesService } from "../services/accountsAndBalancesService.js";
 import { tokenService } from "../services/tokenService";
+import { redisService } from "../services/redisService";
+
+// Validation schemas
+const connectQuerySchema = z.object({
+  market: z.string().default("FR"),
+  locale: z.string().default("en_US"),
+});
+
+const connectBodySchema = z.object({
+  market: z.string().default("FR"),
+  locale: z.string().default("en_US"),
+});
+
+const syncAccountsBodySchema = z.object({
+  code: z.string().min(1, "Authorization code is required"),
+});
+
+const callbackQuerySchema = z.object({
+  code: z.string().optional(),
+  state: z.string().optional(),
+  error: z.string().optional(),
+});
 
 const tinkRoutes: FastifyPluginAsync = async (fastify) => {
   // Tink OAuth callback endpoint
   // URL setup within Tink console
   fastify.get("/api/tink/callback", async (request, reply) => {
     try {
-      const { code, state, error } = request.query as {
-        code?: string;
-        state?: string;
-        error?: string;
-      };
+      const queryResult = callbackQuerySchema.safeParse(request.query);
+
+      if (!queryResult.success) {
+        fastify.log.error(
+          { err: queryResult.error },
+          "Invalid callback query parameters"
+        );
+        const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+        return reply.redirect(`${clientUrl}/accounts?error=invalid_parameters`);
+      }
+
+      const { code, state, error } = queryResult.data;
 
       if (error) {
-        fastify.log.error("Tink OAuth error:", error);
+        fastify.log.error({ error }, "Tink OAuth error");
         return reply
           .status(400)
           .send({ error: "OAuth authorization failed", details: error });
@@ -42,6 +72,32 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
             userId: stateData.userId,
           });
 
+          // Check if this authorization code has already been processed or is currently being processed
+          const isAlreadyProcessed = await redisService.isCodeProcessed(code);
+          if (isAlreadyProcessed) {
+            fastify.log.info(
+              "Authorization code already processed or being processed, redirecting",
+              {
+                code: code.substring(0, 8) + "...",
+              }
+            );
+            const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+            return reply.redirect(`${clientUrl}/accounts?connected=true`);
+          }
+
+          // Mark this code as being processed to prevent race conditions
+          const canProcess = await redisService.markCodeAsProcessing(code);
+          if (!canProcess) {
+            fastify.log.info(
+              "Authorization code is being processed by another instance, redirecting",
+              {
+                code: code.substring(0, 8) + "...",
+              }
+            );
+            const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+            return reply.redirect(`${clientUrl}/accounts?connected=true`);
+          }
+
           try {
             // Exchange authorization code for user access token
             const tokenResponse = await tinkService.getUserAccessToken(code);
@@ -60,11 +116,87 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
               userId: stateData.userId,
               accountCount: syncResult.count,
             });
-          } catch (syncError) {
-            fastify.log.error("Failed to sync accounts", {
-              userId: stateData.userId,
-              error: syncError,
+
+            // Mark as processed and remove from processing set
+            await redisService.markCodeAsCompleted(code);
+
+            // Trigger transaction sync in background (don't await)
+            setImmediate(() => {
+              void (async () => {
+                try {
+                  const { TransactionSyncService } = await import(
+                    "../services/transactionSyncService.js"
+                  );
+                  const transactionSyncService = new TransactionSyncService();
+
+                  // Sync transactions for each newly connected account
+                  const transactionSyncResults = [];
+                  for (const account of syncResult.accounts) {
+                    try {
+                      const transactionSyncResult =
+                        await transactionSyncService.syncInitialTransactions(
+                          fastify.db,
+                          String(stateData.userId),
+                          account.tinkAccountId,
+                          tokenResponse.access_token,
+                          {
+                            dateRangeMonths: 12, // Fetch last 12 months
+                            includeAllStatuses: true, // Include PENDING and UNDEFINED
+                            skipCredentialsRefresh: true, // Skip refresh to avoid scope issues
+                          }
+                        );
+                      transactionSyncResults.push(transactionSyncResult);
+
+                      fastify.log.info("Initial transaction sync completed", {
+                        accountId: account.tinkAccountId,
+                        created: transactionSyncResult.transactionsCreated,
+                        updated: transactionSyncResult.transactionsUpdated,
+                        errors: transactionSyncResult.errors.length,
+                      });
+                    } catch (error) {
+                      fastify.log.error(
+                        { err: error, accountId: account.tinkAccountId },
+                        `Failed to sync transactions for account ${account.tinkAccountId}`
+                      );
+                    }
+                  }
+
+                  const totalTransactionsCreated =
+                    transactionSyncResults.reduce(
+                      (sum, result) => sum + result.transactionsCreated,
+                      0
+                    );
+                  const totalTransactionsUpdated =
+                    transactionSyncResults.reduce(
+                      (sum, result) => sum + result.transactionsUpdated,
+                      0
+                    );
+
+                  fastify.log.info("Background transaction sync completed", {
+                    userId: stateData.userId,
+                    accountCount: syncResult.count,
+                    transactionsCreated: totalTransactionsCreated,
+                    transactionsUpdated: totalTransactionsUpdated,
+                  });
+                } catch (backgroundError) {
+                  fastify.log.error(
+                    { err: backgroundError, userId: stateData.userId },
+                    "Background transaction sync failed"
+                  );
+                }
+              })();
             });
+          } catch (syncError) {
+            // Remove from processing set on error
+            await redisService.removeFromProcessing(code);
+            fastify.log.error(
+              { err: syncError, userId: stateData.userId },
+              "Failed to sync accounts"
+            );
+
+            // Redirect to error page on sync failure
+            const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+            return reply.redirect(`${clientUrl}/accounts?error=sync_failed`);
           }
         }
       } else {
@@ -77,7 +209,7 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
       const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
       return reply.redirect(`${clientUrl}/accounts?connected=true`);
     } catch (error) {
-      fastify.log.error("Error in Tink callback:", error);
+      fastify.log.error({ err: error }, "Error in Tink callback");
       const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
       return reply.redirect(`${clientUrl}/accounts?error=connection_failed`);
     }
@@ -86,10 +218,20 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
   // Endpoint to get Tink connection URL
   fastify.get("/api/tink/connect-url", async (request, reply) => {
     try {
-      const { market = "FR", locale = "en_US" } = request.query as {
-        market?: string;
-        locale?: string;
-      };
+      const queryResult = connectQuerySchema.safeParse(request.query);
+
+      if (!queryResult.success) {
+        fastify.log.error(
+          { err: queryResult.error },
+          "Invalid query parameters for connect-url"
+        );
+        return reply.status(400).send({
+          error: "Invalid parameters",
+          details: queryResult.error.errors,
+        });
+      }
+
+      const { market, locale } = queryResult.data;
 
       // Get authorization grant token and create user access
       const authToken = await tinkService.getAuthorizationGrantToken();
@@ -112,7 +254,7 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
         message: "Redirect user to this URL to connect their bank account",
       });
     } catch (error) {
-      fastify.log.error("Error generating Tink connection URL:", error);
+      fastify.log.error({ err: error }, "Error generating Tink connection URL");
       return reply
         .status(500)
         .send({ error: "Failed to generate connection URL" });
@@ -120,21 +262,25 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Protected endpoint to initiate Tink connection for authenticated user
-  fastify.register(async function protectedTinkInitRoutes(fastify) {
+  await fastify.register(async function protectedTinkInitRoutes(fastify) {
     await fastify.register(authMiddleware);
 
     fastify.post("/api/tink/connect", async (request, reply) => {
       try {
-        // TODO:
-        //         market and locale are extracted via type-cast but never validated.
-        // Senders can post { market: 123, locale: {} } and the code will happily build an invalid URL.
+        const bodyResult = connectBodySchema.safeParse(request.body);
 
-        // Use Fastify’s schema or Zod or other solution to validate the request body market and locale
+        if (!bodyResult.success) {
+          fastify.log.error(
+            { err: bodyResult.error },
+            "Invalid request body for tink connect"
+          );
+          return reply.status(400).send({
+            error: "Invalid parameters",
+            details: bodyResult.error.errors,
+          });
+        }
 
-        const { market = "FR", locale = "en_US" } = request.body as {
-          market?: string;
-          locale?: string;
-        };
+        const { market, locale } = bodyResult.data;
 
         const user = request.user;
         if (!user) {
@@ -160,24 +306,15 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
           { market, locale, state }
         );
 
-        // TODO:
-        //         market and locale are extracted via type-cast but never validated.
-        // Senders can post { market: 123, locale: {} } and the code will happily build an invalid URL.
-
-        // Use Fastify’s schema or Zod:
-
-        // schema: {
-        //   body: z.object({
-        //     market: z.string().default("FR"),
-        //     locale: z.string().default("en_US")
-        //   }).parse
-
         return reply.send({
           url: connectionUrl,
           message: "Redirect user to this URL to connect their bank account",
         });
       } catch (error) {
-        fastify.log.error("Error generating Tink connection URL:", error);
+        fastify.log.error(
+          { err: error },
+          "Error generating Tink connection URL"
+        );
         return reply
           .status(500)
           .send({ error: "Failed to generate connection URL" });
@@ -186,18 +323,25 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Protected endpoint to sync accounts for authenticated user
-  fastify.register(async function protectedTinkRoutes(fastify) {
+  await fastify.register(async function protectedTinkRoutes(fastify) {
     await fastify.register(authMiddleware);
 
     fastify.post("/api/tink/sync-accounts", async (request, reply) => {
       try {
-        const { code } = request.body as { code: string };
+        const bodyResult = syncAccountsBodySchema.safeParse(request.body);
 
-        if (!code) {
-          return reply
-            .status(400)
-            .send({ error: "Missing authorization code" });
+        if (!bodyResult.success) {
+          fastify.log.error(
+            { err: bodyResult.error },
+            "Invalid request body for sync-accounts"
+          );
+          return reply.status(400).send({
+            error: "Invalid parameters",
+            details: bodyResult.error.errors,
+          });
         }
+
+        const { code } = bodyResult.data;
 
         // Get user from authentication middleware
         const user = request.user;
@@ -224,7 +368,7 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
           count: syncResult.count,
         });
       } catch (error) {
-        fastify.log.error("Error syncing Tink accounts:", error);
+        fastify.log.error({ err: error }, "Error syncing Tink accounts");
         return reply.status(500).send({
           error: "Failed to sync accounts",
           details: error instanceof Error ? error.message : "Unknown error",

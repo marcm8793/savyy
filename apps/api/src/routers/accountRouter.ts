@@ -1,40 +1,27 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 import { router, protectedProcedure } from "../trpc";
 import { accountService } from "../services/accountService";
 import { tinkService } from "../services/tinkService";
 import { AccountsAndBalancesService } from "../services/accountsAndBalancesService";
+import { TransactionSyncService } from "../services/transactionSyncService";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { bankAccount } from "../../db/schema.js";
 import { tokenService } from "../services/tokenService";
 import { userService } from "../services/userService";
+import { createSelectSchema } from "drizzle-zod";
 
-// Define Zod schemas manually for bank accounts (updated to match database schema)
-const bankAccountSchema = z.object({
-  id: z.number(),
-  userId: z.string(),
-  tinkAccountId: z.string(),
-  accountName: z.string(),
-  accountType: z.string().nullable(),
-  financialInstitutionId: z.string().nullable(),
-  balance: z
-    .string()
-    .nullable()
-    .transform((val) => (val ? parseFloat(val) : null)),
-  currency: z.string().nullable(),
-  iban: z.string().nullable(),
-  lastRefreshed: z.date().nullable(),
-  accessToken: z.string().nullable(),
-  tokenExpiresAt: z.date().nullable(),
-  tokenScope: z.string().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+// Use drizzle-zod with custom refinements for the balance field
+// This approach uses the createSelectSchema with refinements as shown in the official docs
+// TODO: check if this is needed
+const bankAccountSchema = createSelectSchema(bankAccount, {
+  balance: (schema) =>
+    schema.transform((val) => (val ? parseFloat(val) : null)),
 });
 
-// Define account router with proper schema integration
 export const accountRouter = router({
-  // Get bank accounts for authenticated user
-  getAccounts: protectedProcedure
+  // * Get bank accounts for authenticated user from db
+  getAccountsFromDb: protectedProcedure
     .input(
       z.object({
         limit: z.number().min(1).max(100).default(50),
@@ -44,7 +31,10 @@ export const accountRouter = router({
     .output(z.array(bankAccountSchema))
     .query(async ({ ctx }) => {
       try {
-        const accounts = await accountService.getAccounts(ctx.db, ctx.user.id);
+        const accounts = await accountService.getAccountsFromDb(
+          ctx.db,
+          ctx.user.id
+        );
         ctx.req.server.log.debug(
           {
             userId: ctx.user.id,
@@ -64,91 +54,7 @@ export const accountRouter = router({
       }
     }),
 
-  // Check if user has existing accounts and their status
-  checkExistingAccounts: protectedProcedure
-    .output(
-      z.object({
-        hasAccounts: z.boolean(),
-        accountCount: z.number(),
-        needsReconnection: z.boolean(),
-        message: z.string(),
-      })
-    )
-    .query(async ({ ctx }) => {
-      try {
-        const accounts = await accountService.getAccounts(ctx.db, ctx.user.id);
-        const hasAccounts = accounts.length > 0;
-
-        // Check if any accounts need token refresh
-        const now = new Date();
-        const needsReconnection = accounts.some(
-          (account) => !account.tokenExpiresAt || account.tokenExpiresAt < now
-        );
-
-        let message = "";
-        if (!hasAccounts) {
-          message =
-            "No bank accounts connected. You can connect your first account.";
-        } else if (needsReconnection) {
-          message = `You have ${accounts.length} account(s) but some connections have expired. Please reconnect.`;
-        } else {
-          message = `You have ${accounts.length} active account(s) connected.`;
-        }
-
-        return {
-          hasAccounts,
-          accountCount: accounts.length,
-          needsReconnection,
-          message,
-        };
-      } catch (error) {
-        ctx.req.server.log.error("Failed to check existing accounts:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to check account status",
-          cause: error,
-        });
-      }
-    }),
-
-  // Remove existing bank accounts to allow reconnection
-  removeAllAccounts: protectedProcedure
-    .output(
-      z.object({
-        message: z.string(),
-        removedCount: z.number(),
-      })
-    )
-    .mutation(async ({ ctx }) => {
-      try {
-        // Delete all accounts for this user from our database
-        const result = await ctx.db
-          .delete(bankAccount)
-          .where(eq(bankAccount.userId, ctx.user.id))
-          .returning();
-
-        const removedCount = Array.isArray(result) ? result.length : 0;
-
-        ctx.req.server.log.info("Removed all accounts for user:", {
-          userId: ctx.user.id,
-          removedCount,
-        });
-
-        return {
-          message: `Successfully removed ${removedCount} account(s). You can now connect your bank account again.`,
-          removedCount,
-        };
-      } catch (error) {
-        ctx.req.server.log.error("Failed to remove accounts:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to remove accounts",
-          cause: error,
-        });
-      }
-    }),
-
-  // Get secure Tink connection URL with state parameter
+  // * Get secure Tink connection URL with state parameter
   connectBankAccount: protectedProcedure
     .input(
       z.object({
@@ -273,7 +179,7 @@ export const accountRouter = router({
       }
     }),
 
-  // Sync accounts from Tink using existing services
+  // * Sync accounts from Tink using existing services
   syncTinkAccounts: protectedProcedure
     .input(
       z.object({
@@ -308,7 +214,8 @@ export const accountRouter = router({
         });
 
         return {
-          message: "Accounts synchronized successfully",
+          message:
+            "Accounts synchronized successfully. Transactions are being imported in the background.",
           accounts: syncResult.accounts,
           count: syncResult.count,
         };
@@ -330,6 +237,96 @@ export const accountRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to sync accounts",
+          cause: error,
+        });
+      }
+    }),
+
+  // * Manual transaction sync for specific account from Tink
+  syncAccountTransactions: protectedProcedure
+    .input(
+      z.object({
+        accountId: z.string(),
+        dateRangeMonths: z.number().min(1).max(24).default(3),
+        includeAllStatuses: z.boolean().default(true),
+      })
+    )
+    .output(
+      z.object({
+        success: z.boolean(),
+        message: z.string(),
+        transactionsCreated: z.number(),
+        transactionsUpdated: z.number(),
+        totalTransactionsFetched: z.number(),
+        errors: z.array(z.string()),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // Get the bank account and verify it belongs to the user
+        const accounts = await ctx.db
+          .select()
+          .from(bankAccount)
+          .where(eq(bankAccount.userId, ctx.user.id));
+
+        const account = accounts.find(
+          (acc) => acc.tinkAccountId === input.accountId
+        );
+        if (!account) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Bank account not found",
+          });
+        }
+
+        if (!account.accessToken) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "No access token available for this account. Please reconnect your bank account.",
+          });
+        }
+
+        // Check token expiration
+        if (account.tokenExpiresAt && account.tokenExpiresAt < new Date()) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message:
+              "Access token has expired. Please reconnect your bank account.",
+          });
+        }
+
+        const transactionSyncService = new TransactionSyncService();
+        const syncResult = await transactionSyncService.syncInitialTransactions(
+          ctx.db,
+          ctx.user.id,
+          input.accountId,
+          account.accessToken,
+          {
+            dateRangeMonths: input.dateRangeMonths,
+            includeAllStatuses: input.includeAllStatuses,
+          }
+        );
+
+        return {
+          success: syncResult.success,
+          message: syncResult.success
+            ? `Successfully synced ${syncResult.transactionsCreated} new transactions and updated ${syncResult.transactionsUpdated} existing ones.`
+            : `Sync completed with errors. ${syncResult.errors.length} errors occurred.`,
+          transactionsCreated: syncResult.transactionsCreated,
+          transactionsUpdated: syncResult.transactionsUpdated,
+          totalTransactionsFetched: syncResult.totalTransactionsFetched,
+          errors: syncResult.errors,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        ctx.req.server.log.error("Failed to sync account transactions:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to sync transactions",
           cause: error,
         });
       }

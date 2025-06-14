@@ -4,7 +4,7 @@ import { bankAccount, schema } from "../../db/schema";
 
 // Account service methods that accept database instances
 export const accountService = {
-  async getAccounts(db: NodePgDatabase<typeof schema>, userId: string) {
+  async getAccountsFromDb(db: NodePgDatabase<typeof schema>, userId: string) {
     return await db
       .select()
       .from(bankAccount)

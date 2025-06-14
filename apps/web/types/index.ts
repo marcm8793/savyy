@@ -14,12 +14,12 @@ export type SessionOutput = RouterOutputs["auth"]["getSession"];
 export type ProfileOutput = RouterOutputs["auth"]["getProfile"];
 
 // Account-related types (from server account router)
-export type GetAccountsInput = RouterInputs["account"]["getAccounts"];
+export type GetAccountsInput = RouterInputs["account"]["getAccountsFromDb"];
 
 export type ConnectBankInput = RouterInputs["account"]["connectBankAccount"];
 export type SyncTinkAccountsInput = RouterInputs["account"]["syncTinkAccounts"];
 
-export type AccountsOutput = RouterOutputs["account"]["getAccounts"];
+export type AccountsOutput = RouterOutputs["account"]["getAccountsFromDb"];
 
 export type ConnectBankOutput = RouterOutputs["account"]["connectBankAccount"];
 export type SyncTinkAccountsOutput =

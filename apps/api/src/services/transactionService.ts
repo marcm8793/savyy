@@ -85,8 +85,8 @@ export const transactionService = {
     };
   },
 
-  // Get transaction by Tink-style ID (string instead of number)
-  async getTransactionById(
+  // * Get transaction by id
+  async getTransactionByIdFromDb(
     db: NodePgDatabase<typeof schema>,
     transactionId: string, // Changed to string to match Tink API
     userId: string
@@ -105,7 +105,7 @@ export const transactionService = {
   },
 
   // Update transaction
-  async updateTransaction(
+  async updateTransactionInDb(
     db: NodePgDatabase<typeof schema>,
     transactionId: string, // Changed to string
     data: Partial<typeof transaction.$inferInsert>,
@@ -125,7 +125,7 @@ export const transactionService = {
   },
 
   // Delete transaction
-  async deleteTransaction(
+  async deleteTransactionFromDb(
     db: NodePgDatabase<typeof schema>,
     transactionId: string, // Changed to string
     userId: string
@@ -141,7 +141,7 @@ export const transactionService = {
   },
 
   // Additional method to get transactions by account ID (common Tink use case)
-  async getTransactionsByAccountId(
+  async getTransactionsByAccountIdFromDb(
     db: NodePgDatabase<typeof schema>,
     accountId: string,
     userId: string,

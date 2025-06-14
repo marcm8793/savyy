@@ -132,7 +132,8 @@ export class TransactionSyncService {
       console.log(
         `Fetching transactions from ${dateRange.from} to ${dateRange.to}`
       );
-
+      //TODO: Possible credentials mis-mapping
+      // refreshCredentialsWithAuthToken is invoked with tinkAccountId, but the Tink endpoint expects a credentials ID, not an account ID. If those IDs differ, refresh will 404 and silently fall back to stale data.
       // 3. Optionally refresh credentials to get fresher data
       if (!skipCredentialsRefresh) {
         try {

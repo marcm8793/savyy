@@ -108,6 +108,9 @@ function verifyWebhookSignature(
     .digest("hex");
 
   // Use constant-time comparison to prevent timing attacks
+  if (signature.length !== expectedSignature.length) {
+    return false;
+  }
   return crypto.timingSafeEqual(
     Buffer.from(signature, "hex"),
     Buffer.from(expectedSignature, "hex")
@@ -569,6 +572,11 @@ export const transactionRouter = router({
     }),
 
   // Refresh credentials (trigger Tink to fetch fresh data)
+  // TODO: Credentials vs. account id confusion
+  // refreshCredentials looks up the record by tinkAccountId but then sends credentialsId to
+  // POST /credentials/{id}/refresh. Tink's credentials id ≠ account id – the request will 404 for most banks.
+
+  // Add a dedicated credentialsId column on bankAccount (already stored by Tink) or query credentials table instead.
   refreshCredentials: protectedProcedure
     .input(refreshCredentialsSchema)
     .mutation(async ({ ctx, input }) => {

@@ -245,6 +245,12 @@ class RedisService {
       }
 
       const now = Date.now();
+      // TODO: Make this configurable
+      //       Ensure consistency with the hardcoded timeout value.
+      // This hardcoded value should match the TTL set in markCodeAsProcessing. Consider using the same configurable constant suggested earlier.
+
+      // -      const maxProcessingTime = 10 * 60 * 1000; // 10 minutes
+      // +      const maxProcessingTime = this.PROCESSING_TIMEOUT_SECONDS * 1000;
       const maxProcessingTime = 10 * 60 * 1000; // 10 minutes
       const codesToRemove: string[] = [];
 

@@ -86,7 +86,18 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
           }
 
           // Mark this code as being processed to prevent race conditions
-          const canProcess = await redisService.markCodeAsProcessing(code);
+          let canProcess = false;
+          try {
+            canProcess = await redisService.markCodeAsProcessing(code);
+          } catch (redisError) {
+            fastify.log.warn(
+              { err: redisError, code: code.substring(0, 8) + "..." },
+              "Redis unavailable for markCodeAsProcessing, allowing processing to continue"
+            );
+            // Fallback: allow processing when Redis is down to avoid permanent lock-out
+            canProcess = true;
+          }
+
           if (!canProcess) {
             fastify.log.info(
               "Authorization code is being processed by another instance, redirecting",
@@ -118,7 +129,16 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
             });
 
             // Mark as processed and remove from processing set
-            await redisService.markCodeAsCompleted(code);
+            try {
+              await redisService.markCodeAsCompleted(code);
+            } catch (redisError) {
+              fastify.log.warn(
+                { err: redisError, code: code.substring(0, 8) + "..." },
+                "Redis unavailable for markCodeAsCompleted, processing completed but cleanup failed"
+              );
+              // Note: Processing was successful, Redis cleanup failure is non-critical
+              // The code will eventually be cleaned up by the cleanup job or TTL
+            }
 
             // Trigger transaction sync in background (don't await)
             setImmediate(() => {
@@ -188,7 +208,16 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
             });
           } catch (syncError) {
             // Remove from processing set on error
-            await redisService.removeFromProcessing(code);
+            try {
+              await redisService.removeFromProcessing(code);
+            } catch (redisError) {
+              fastify.log.warn(
+                { err: redisError, code: code.substring(0, 8) + "..." },
+                "Redis unavailable for removeFromProcessing during error cleanup"
+              );
+              // Note: Cleanup failure is non-critical, the cleanup job will handle it
+            }
+
             fastify.log.error(
               { err: syncError, userId: stateData.userId },
               "Failed to sync accounts"

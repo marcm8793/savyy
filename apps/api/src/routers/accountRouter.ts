@@ -29,19 +29,24 @@ export const accountRouter = router({
       })
     )
     .output(z.array(bankAccountSchema))
-    .query(async ({ ctx }) => {
+    .query(async ({ ctx, input }) => {
       try {
         const accounts = await accountService.getAccountsFromDb(
           ctx.db,
-          ctx.user.id
+          ctx.user.id,
+          {
+            limit: input.limit,
+            offset: input.offset,
+          }
         );
         ctx.req.server.log.debug(
           {
             userId: ctx.user.id,
             count: accounts.length,
-            accounts: accounts,
+            limit: input.limit,
+            offset: input.offset,
           },
-          "Fetched accounts"
+          "Fetched accounts with pagination"
         );
         return accounts;
       } catch (error) {

@@ -22,6 +22,7 @@ export type {
   TransactionFetchOptions,
   DateRange,
   StorageResult,
+  TransactionPage,
 } from "./types";
 
 // Default export for main sync service (backward compatibility)

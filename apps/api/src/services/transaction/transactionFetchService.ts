@@ -1,9 +1,11 @@
 import { TinkService } from "../tinkService";
-import { TinkTransaction, TinkTransactionsResponse, DateRange } from "./types";
+import { TinkTransactionsResponse, DateRange } from "./types";
+import { httpRetry } from "../../utils/httpRetry";
 
 /**
  * Service responsible for fetching transactions from Tink API
  * Handles pagination, rate limiting, and API communication
+ * Uses shared HTTP retry utility for robust error handling
  */
 export class TransactionFetchService {
   private readonly baseUrl: string;
@@ -15,17 +17,26 @@ export class TransactionFetchService {
   }
 
   /**
-   * Fetch all transactions with pagination
-   * Handles automatic pagination and rate limiting
+   * Sleep for specified milliseconds
    */
-  async fetchAllTransactions(
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Fetch transactions page by page with async iteration
+   * Memory-efficient approach that processes one page at a time
+   * Uses shared retry utility for robust error handling
+   */
+  async *fetchPagedTransactions(
     userAccessToken: string,
     accountId: string,
     dateRange: DateRange,
     includeAllStatuses: boolean
-  ): Promise<TinkTransaction[]> {
-    const allTransactions: TinkTransaction[] = [];
+  ): AsyncGenerator<TinkTransactionsResponse, void, unknown> {
     let nextPageToken: string | undefined;
+    let totalFetched = 0;
+    let pageNumber = 1;
 
     const statusFilter = includeAllStatuses
       ? ["BOOKED", "PENDING", "UNDEFINED"]
@@ -45,14 +56,19 @@ export class TransactionFetchService {
       }
 
       const url = `${this.baseUrl}/data/v2/transactions?${params.toString()}`;
+      const context = `Fetch transactions page ${pageNumber} for account ${accountId}`;
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${userAccessToken}`,
-          "Content-Type": "application/json",
+      const response = await httpRetry.fetchWithRetry(
+        url,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${userAccessToken}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+        context
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -61,24 +77,35 @@ export class TransactionFetchService {
 
       const data: TinkTransactionsResponse =
         (await response.json()) as TinkTransactionsResponse;
-      allTransactions.push(...data.transactions);
+
+      totalFetched += data.transactions.length;
       nextPageToken = data.nextPageToken;
 
       console.log(
-        `Fetched ${data.transactions.length} transactions, total so far: ${allTransactions.length}`
+        `Fetched page ${pageNumber} with ${data.transactions.length} transactions, total so far: ${totalFetched}`
       );
+
+      // Yield the page for immediate processing
+      yield data;
 
       // Add small delay to avoid rate limiting
       if (nextPageToken) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await this.sleep(100);
       }
+
+      pageNumber++;
     } while (nextPageToken);
 
-    return allTransactions;
+    console.log(
+      `Completed fetching ${totalFetched} transactions in total across ${
+        pageNumber - 1
+      } pages`
+    );
   }
 
   /**
    * Refresh credentials to get fresher transaction data
+   * Uses shared retry utility for robustness
    * Note: This method has a known issue where it passes accountId instead of credentialsId
    * TODO: Fix credentials ID mapping
    */
@@ -86,15 +113,19 @@ export class TransactionFetchService {
     credentialsId: string,
     userAccessToken: string
   ): Promise<void> {
-    const response = await fetch(
-      `${this.baseUrl}/data/v2/credentials/${credentialsId}/refresh`,
+    const url = `${this.baseUrl}/data/v2/credentials/${credentialsId}/refresh`;
+    const context = `Refresh credentials ${credentialsId}`;
+
+    const response = await httpRetry.fetchWithRetry(
+      url,
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${userAccessToken}`,
           "Content-Type": "application/json",
         },
-      }
+      },
+      context
     );
 
     if (!response.ok) {
@@ -109,21 +140,25 @@ export class TransactionFetchService {
 
   /**
    * Refresh credentials using authorization grant token
-   * Alternative method for credential refresh
+   * Alternative method for credential refresh with retry logic
    */
   async refreshCredentialsWithAuthToken(
     credentialsId: string,
     authToken: string
   ): Promise<void> {
-    const response = await fetch(
-      `${this.baseUrl}/data/v2/credentials/${credentialsId}/refresh`,
+    const url = `${this.baseUrl}/data/v2/credentials/${credentialsId}/refresh`;
+    const context = `Refresh credentials ${credentialsId} with auth token`;
+
+    const response = await httpRetry.fetchWithRetry(
+      url,
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${authToken}`,
           "Content-Type": "application/json",
         },
-      }
+      },
+      context
     );
 
     if (!response.ok) {
@@ -157,7 +192,7 @@ export class TransactionFetchService {
     // 3. Optionally refresh credentials to get fresher data
     //       Credentials refresh is called with an account ID, not credentials ID.
     // refreshCredentialsWithAuthToken(tinkAccountId, …) passes a bank‐account ID to the /credentials/:id/refresh endpoint, which expects credentialsId.
-    // Result: 404 → stale data despite “success” log.
+    // Result: 404 → stale data despite "success" log.
 
     // Pass the correct credentialsId (often available on the bankAccount row) or map account → credentials before calling.
     try {
@@ -169,7 +204,7 @@ export class TransactionFetchService {
       );
 
       // Wait a bit for Tink to process the refresh
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await this.sleep(2000);
       console.log(`Credentials refreshed successfully for ${tinkAccountId}`);
       return true;
     } catch (error) {

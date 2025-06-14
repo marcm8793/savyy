@@ -135,7 +135,8 @@ export class TransactionStorageService {
   }
 
   /**
-   * Get sync status for a bank account
+   * Get sync status for a bank account using SQL aggregates for performance
+   * Uses O(1) SQL aggregation instead of loading all transactions into memory
    */
   async getSyncStatus(
     db: NodePgDatabase<typeof schema>,
@@ -169,10 +170,12 @@ export class TransactionStorageService {
 
     const bankAcc = bankAccountResult[0];
 
-    // Get transaction statistics
-    const transactions = await db
+    // Get transaction statistics using SQL aggregates (O(1) performance)
+    const statsResult = await db
       .select({
-        bookedDate: transaction.bookedDate,
+        totalTransactions: sql<number>`COUNT(*)::int`,
+        oldestTransaction: sql<string | null>`MIN(${transaction.bookedDate})`,
+        newestTransaction: sql<string | null>`MAX(${transaction.bookedDate})`,
       })
       .from(transaction)
       .where(
@@ -182,18 +185,14 @@ export class TransactionStorageService {
         )
       );
 
-    const bookedDates = transactions
-      .map((t) => t.bookedDate)
-      .filter((date) => date !== null)
-      .sort();
+    const stats = statsResult[0];
 
     return {
       accountId: tinkAccountId,
       lastSynced: bankAcc.lastRefreshed,
-      totalTransactions: transactions.length,
-      oldestTransaction: bookedDates.length > 0 ? bookedDates[0] : null,
-      newestTransaction:
-        bookedDates.length > 0 ? bookedDates[bookedDates.length - 1] : null,
+      totalTransactions: stats.totalTransactions,
+      oldestTransaction: stats.oldestTransaction,
+      newestTransaction: stats.newestTransaction,
     };
   }
 

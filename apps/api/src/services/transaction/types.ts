@@ -70,3 +70,9 @@ export interface StorageResult {
   updated: number;
   errors: string[];
 }
+
+export interface TransactionPage {
+  transactions: TinkTransaction[];
+  nextPageToken?: string;
+  totalFetched: number;
+}

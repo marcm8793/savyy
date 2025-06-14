@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 import { router, protectedProcedure } from "../trpc";
 import { tinkService } from "../services/tinkService";
-import { TransactionSyncService } from "../services/transaction/transactionSyncService";
+import { TransactionSyncService } from "../services/transaction";
 import { TRPCError } from "@trpc/server";
 import { eq, and } from "drizzle-orm";
 import { bankAccount } from "../../db/schema";

@@ -749,7 +749,7 @@ export const transactionRouter = router({
       }
     }),
 
-  // Get transaction statistics
+  // Get transaction statistics using SQL aggregates for performance
   stats: protectedProcedure
     .input(
       z.object({
@@ -778,54 +778,91 @@ export const transactionRouter = router({
           conditions.push(lte(transaction.bookedDate, input.dateRange.to));
         }
 
-        // Get basic statistics
-        const transactions = await db
+        // Get basic statistics using SQL aggregates (O(1) performance)
+        const basicStatsResult = await db
           .select({
-            amount: transaction.amount,
-            amountScale: transaction.amountScale,
-            currencyCode: transaction.currencyCode,
-            status: transaction.status,
-            categoryName: transaction.categoryName,
+            totalTransactions: sql<number>`COUNT(*)::int`,
+            totalIncome: sql<number>`
+              COALESCE(
+                SUM(
+                  CASE
+                    WHEN (${transaction.amount}::numeric / POWER(10, COALESCE(${transaction.amountScale}, 0))) > 0
+                    THEN (${transaction.amount}::numeric / POWER(10, COALESCE(${transaction.amountScale}, 0)))
+                    ELSE 0
+                  END
+                )::numeric,
+                0
+              )
+            `,
+            totalExpenses: sql<number>`
+              COALESCE(
+                ABS(
+                  SUM(
+                    CASE
+                      WHEN (${transaction.amount}::numeric / POWER(10, COALESCE(${transaction.amountScale}, 0))) < 0
+                      THEN (${transaction.amount}::numeric / POWER(10, COALESCE(${transaction.amountScale}, 0)))
+                      ELSE 0
+                    END
+                  )
+                )::numeric,
+                0
+              )
+            `,
           })
           .from(transaction)
           .where(and(...conditions));
 
-        // Helper function to convert amount to real value considering scale
-        const toNumber = (t: (typeof transactions)[number]) =>
-          Number(t.amount) / 10 ** (t.amountScale ?? 0);
+        // Get status breakdown using SQL aggregates
+        const statusStatsResult = await db
+          .select({
+            status: transaction.status,
+            count: sql<number>`COUNT(*)::int`,
+          })
+          .from(transaction)
+          .where(and(...conditions))
+          .groupBy(transaction.status);
 
-        // Calculate statistics
-        const totalTransactions = transactions.length;
-        const totalIncome = transactions
-          .filter((t) => toNumber(t) > 0)
-          .reduce((sum, t) => sum + toNumber(t), 0);
-        const totalExpenses = Math.abs(
-          transactions
-            .filter((t) => toNumber(t) < 0)
-            .reduce((sum, t) => sum + toNumber(t), 0)
-        );
+        // Get category breakdown using SQL aggregates
+        const categoryStatsResult = await db
+          .select({
+            categoryName: sql<string>`COALESCE(${transaction.categoryName}, 'Uncategorized')`,
+            count: sql<number>`COUNT(*)::int`,
+            amount: sql<number>`
+              COALESCE(
+                SUM(${transaction.amount}::numeric / POWER(10, COALESCE(${transaction.amountScale}, 0)))::numeric,
+                0
+              )
+            `,
+          })
+          .from(transaction)
+          .where(and(...conditions))
+          .groupBy(sql`COALESCE(${transaction.categoryName}, 'Uncategorized')`);
 
-        // Group by category
-        const categoryStats = transactions.reduce((acc, t) => {
-          const category = t.categoryName || "Uncategorized";
-          if (!acc[category]) {
-            acc[category] = { count: 0, amount: 0 };
-          }
-          acc[category].count++;
-          acc[category].amount += toNumber(t);
+        const basicStats = basicStatsResult[0];
+        const totalIncome = Number(basicStats.totalIncome);
+        const totalExpenses = Number(basicStats.totalExpenses);
+
+        // Transform results into expected format
+        const statusBreakdown = statusStatsResult.reduce((acc, row) => {
+          acc[row.status] = row.count;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const categoryBreakdown = categoryStatsResult.reduce((acc, row) => {
+          acc[row.categoryName] = {
+            count: row.count,
+            amount: Number(row.amount),
+          };
           return acc;
         }, {} as Record<string, { count: number; amount: number }>);
 
         return {
-          totalTransactions,
+          totalTransactions: basicStats.totalTransactions,
           totalIncome,
           totalExpenses,
           netAmount: totalIncome - totalExpenses,
-          categoryBreakdown: categoryStats,
-          statusBreakdown: transactions.reduce((acc, t) => {
-            acc[t.status] = (acc[t.status] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>),
+          categoryBreakdown,
+          statusBreakdown,
         };
       } catch (error) {
         console.error("Error calculating transaction stats:", error);

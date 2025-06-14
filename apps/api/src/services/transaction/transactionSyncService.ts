@@ -76,30 +76,44 @@ export class TransactionSyncService {
         skipCredentialsRefresh
       );
 
-      // 4. Fetch all transactions with pagination
-      const allTransactions = await this.fetchService.fetchAllTransactions(
+      // 4. Fetch and process transactions page by page (memory-efficient)
+      let totalCreated = 0;
+      let totalUpdated = 0;
+      const allErrors: string[] = [];
+
+      for await (const page of this.fetchService.fetchPagedTransactions(
         userAccessToken,
         tinkAccountId,
         dateRange,
         includeAllStatuses
-      );
+      )) {
+        result.totalTransactionsFetched += page.transactions.length;
 
-      result.totalTransactionsFetched = allTransactions.length;
+        // Process this page immediately to avoid memory buildup
+        const storeResult =
+          await this.storageService.storeTransactionsWithUpsert(
+            db,
+            userId,
+            bankAcc.id,
+            page.transactions
+          );
+
+        totalCreated += storeResult.created;
+        totalUpdated += storeResult.updated;
+        allErrors.push(...storeResult.errors);
+
+        console.log(
+          `Processed page: ${storeResult.created} created, ${storeResult.updated} updated, ${storeResult.errors.length} errors`
+        );
+      }
+
       console.log(
-        `Fetched ${allTransactions.length} transactions from Tink API`
+        `Completed processing ${result.totalTransactionsFetched} transactions from Tink API`
       );
 
-      // 5. Store transactions with upsert strategy
-      const storeResult = await this.storageService.storeTransactionsWithUpsert(
-        db,
-        userId,
-        bankAcc.id,
-        allTransactions
-      );
-
-      result.transactionsCreated = storeResult.created;
-      result.transactionsUpdated = storeResult.updated;
-      result.errors = storeResult.errors;
+      result.transactionsCreated = totalCreated;
+      result.transactionsUpdated = totalUpdated;
+      result.errors = allErrors;
 
       // 6. Update bank account's last refreshed timestamp
       await this.storageService.updateAccountLastRefreshed(db, bankAcc.id);

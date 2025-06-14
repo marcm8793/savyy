@@ -1,6 +1,7 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, and } from "drizzle-orm";
 import { BankAccount, bankAccount, schema } from "../../db/schema";
+import { httpRetry } from "../utils/httpRetry";
 
 // Types based on Tink API documentation
 interface CurrencyDenominatedAmount {
@@ -96,25 +97,27 @@ export class AccountsAndBalancesService {
   /**
    * Fetch accounts and balances from Tink API
    * Requires user access token with balances:read and accounts:read scopes
+   * Now includes retry logic for robust error handling
    */
   async fetchAccountsAndBalances(
     userAccessToken: string,
     params?: ListAccountsParams
   ): Promise<ListAccountsResponse> {
-    console.log("Fetching accounts and balances from Tink API...");
-
-    // Build query parameters
     const queryParams = new URLSearchParams();
+
     if (params?.pageSize) {
       queryParams.append("pageSize", params.pageSize.toString());
     }
+
     if (params?.pageToken) {
       queryParams.append("pageToken", params.pageToken);
     }
-    if (params?.idIn) {
+
+    if (params?.idIn && params.idIn.length > 0) {
       params.idIn.forEach((id) => queryParams.append("idIn", id));
     }
-    if (params?.typesIn) {
+
+    if (params?.typesIn && params.typesIn.length > 0) {
       params.typesIn.forEach((type) => queryParams.append("typesIn", type));
     }
 
@@ -122,13 +125,17 @@ export class AccountsAndBalancesService {
       queryParams.toString() ? `?${queryParams.toString()}` : ""
     }`;
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${userAccessToken}`,
-        "Content-Type": "application/json",
+    const response = await httpRetry.fetchWithRetry(
+      url,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${userAccessToken}`,
+          "Content-Type": "application/json",
+        },
       },
-    });
+      "Fetch accounts and balances from Tink API"
+    );
 
     console.log("Tink accounts API response:", {
       status: response.status,

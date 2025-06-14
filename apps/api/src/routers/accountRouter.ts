@@ -16,8 +16,11 @@ const bankAccountSchema = createSelectSchema(bankAccount, {
       if (val === null || val === undefined) {
         return null;
       }
-      const parsed = typeof val === "string" ? parseFloat(val) : val;
-      return isNaN(parsed) ? null : parsed;
+      const parsed = typeof val === "string" ? Number(val) : val; // `Number` rejects "Infinity"
+      if (!Number.isFinite(parsed)) {
+        return null; // Reject Infinity / -Infinity
+      }
+      return parsed;
     }),
 });
 

@@ -1,6 +1,6 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
-import { schema, Transaction, transaction } from "../../db/schema";
+import { schema, Transaction, transaction } from "../../../db/schema";
 
 // Types based on Tink API structure
 export interface TinkTransactionFilters {
@@ -17,8 +17,11 @@ export interface TinkTransactionResponse {
   transactions: Transaction[];
 }
 
-// Transaction service methods
-export const transactionService = {
+/**
+ * Transaction Query Service
+ * Handles Tink-style transaction filtering and querying operations
+ */
+export class TransactionQueryService {
   // Get transactions with Tink-style filtering
   async getTransactions(
     db: NodePgDatabase<typeof schema>,
@@ -83,7 +86,7 @@ export const transactionService = {
       nextPageToken:
         results.length === pageSize ? "next_page_token_here" : undefined,
     };
-  },
+  }
 
   // * Get transaction by id
   async getTransactionByIdFromDb(
@@ -102,7 +105,7 @@ export const transactionService = {
       )
       .limit(1);
     return result[0] || null;
-  },
+  }
 
   // Update transaction
   async updateTransactionInDb(
@@ -122,7 +125,7 @@ export const transactionService = {
       )
       .returning();
     return result[0];
-  },
+  }
 
   // Delete transaction
   async deleteTransactionFromDb(
@@ -138,7 +141,7 @@ export const transactionService = {
           eq(transaction.userId, userId)
         )
       );
-  },
+  }
 
   // Additional method to get transactions by account ID (common Tink use case)
   async getTransactionsByAccountIdFromDb(
@@ -147,9 +150,12 @@ export const transactionService = {
     userId: string,
     filters?: Omit<TinkTransactionFilters, "accountIdIn">
   ) {
-    return transactionService.getTransactions(db, userId, {
+    return this.getTransactions(db, userId, {
       ...filters,
       accountIdIn: [accountId],
     });
-  },
-};
+  }
+}
+
+// Singleton instance
+export const transactionQueryService = new TransactionQueryService();

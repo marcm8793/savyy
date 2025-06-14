@@ -7,12 +7,11 @@ This directory contains all business logic services for the Savyy API. Services 
 ### 🏦 **Banking & Financial Services**
 
 - `accountsAndBalancesService.ts` - Account management, balances, and CRUD operations
-- `transactionService.ts` - Transaction CRUD operations and filtering
-- `transactionSyncService.ts` - **DEPRECATED** - Backward compatibility wrapper
-- `transaction/` - **NEW** Modular transaction services:
+- `transaction/` - **Modular transaction services**:
   - `transactionSyncService.ts` - Core sync orchestration
   - `transactionFetchService.ts` - API fetching and pagination
   - `transactionStorageService.ts` - Database operations and bulk upserts
+  - `transactionQueryService.ts` - Tink-style filtering, CRUD operations, and querying
   - `types.ts` - Shared TypeScript interfaces
   - `index.ts` - Clean re-exports
 

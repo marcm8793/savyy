@@ -13,6 +13,10 @@ export {
   TransactionStorageService,
   transactionStorageService,
 } from "./transactionStorageService";
+export {
+  TransactionQueryService,
+  transactionQueryService,
+} from "./transactionQueryService";
 
 // Types
 export type {
@@ -24,6 +28,12 @@ export type {
   StorageResult,
   TransactionPage,
 } from "./types";
+
+// Additional query service types
+export type {
+  TinkTransactionFilters,
+  TinkTransactionResponse,
+} from "./transactionQueryService";
 
 // Default export for main sync service (backward compatibility)
 export { transactionSyncService as default } from "./transactionSyncService";

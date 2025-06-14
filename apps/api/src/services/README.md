@@ -8,7 +8,13 @@ This directory contains all business logic services for the Savyy API. Services 
 
 - `accountsAndBalancesService.ts` - Account management, balances, and CRUD operations
 - `transactionService.ts` - Transaction CRUD operations and filtering
-- `transactionSyncService.ts` - Transaction synchronization with Tink API
+- `transactionSyncService.ts` - **DEPRECATED** - Backward compatibility wrapper
+- `transaction/` - **NEW** Modular transaction services:
+  - `transactionSyncService.ts` - Core sync orchestration
+  - `transactionFetchService.ts` - API fetching and pagination
+  - `transactionStorageService.ts` - Database operations and bulk upserts
+  - `types.ts` - Shared TypeScript interfaces
+  - `index.ts` - Clean re-exports
 
 ### 🔗 **External API Integration**
 
@@ -49,9 +55,28 @@ export const serviceName = {
 - Services should not directly import other services (use composition in routers)
 - Environment variables are validated in constructors
 
+## Recent Refactoring (Completed)
+
+### ✅ **Transaction Services Modularization**
+
+- **Before**: Single 529-line `transactionSyncService.ts` with mixed responsibilities
+- **After**: Modular structure with focused services:
+  - **Separation of Concerns**: Fetch, Storage, and Sync logic separated
+  - **Better Testability**: Each service can be tested independently
+  - **Improved Maintainability**: Smaller, focused files are easier to understand
+  - **Backward Compatibility**: Existing imports continue to work
+
+### Benefits Achieved:
+
+- 🎯 **Single Responsibility**: Each service has one clear purpose
+- 📦 **Better Modularity**: 150-200 lines per service vs 529 lines
+- 🔄 **Improved Reusability**: Services can be composed differently
+- 🐛 **Easier Debugging**: Issues isolated to specific domains
+- 👥 **Team Development**: Multiple developers can work on different services
+
 ## Future Refactoring Considerations
 
-1. **Split large services** (>400 lines) into focused modules
+1. **Split tinkService.ts** (509 lines) into auth, user, and API client modules
 2. **Create service interfaces** for better testability
 3. **Add service-level error handling** and logging
 4. **Implement service health checks** for monitoring

@@ -5,6 +5,7 @@ import { authMiddleware } from "../middleware/authMiddleware";
 import { AccountsAndBalancesService } from "../services/accountsAndBalancesService.js";
 import { tokenService } from "../services/tokenService";
 import { redisService } from "../services/redisService";
+import { TransactionSyncService } from "../services/transaction/transactionSyncService";
 
 // Validation schemas
 const connectQuerySchema = z.object({
@@ -144,9 +145,6 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
             setImmediate(() => {
               void (async () => {
                 try {
-                  const { TransactionSyncService } = await import(
-                    "../services/transactionSyncService.js"
-                  );
                   const transactionSyncService = new TransactionSyncService();
 
                   // Sync transactions for each newly connected account

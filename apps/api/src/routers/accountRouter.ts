@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 import { router, protectedProcedure } from "../trpc";
 import { tinkService } from "../services/tinkService";
-import { TransactionSyncService } from "../services/transactionSyncService";
+import { TransactionSyncService } from "../services/transaction/transactionSyncService";
 import { TRPCError } from "@trpc/server";
 import { eq, and } from "drizzle-orm";
 import { bankAccount } from "../../db/schema";
@@ -24,10 +24,7 @@ const bankAccountSchema = createSelectSchema(bankAccount, {
           : val;
 
       if (!Number.isFinite(parsed)) {
-        return null;
-      }
-      if (!Number.isFinite(parsed)) {
-        return null; // Reject Infinity / -Infinity
+        return null; // Reject NaN / ±Infinity
       }
       return parsed;
     }),

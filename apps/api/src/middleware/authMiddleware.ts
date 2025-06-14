@@ -70,7 +70,10 @@ export const authMiddleware: FastifyPluginAsync = async (fastify) => {
     try {
       // Get session using better-auth
       const session = await auth.api.getSession({
-        headers: request.headers as any,
+        headers: new Headers(Object.entries(request.headers).map(([key, value]) => [
+          key,
+          Array.isArray(value) ? value.join(', ') : value || ''
+        ])),
       });
 
       if (!session) {
@@ -97,10 +100,13 @@ export const authMiddleware: FastifyPluginAsync = async (fastify) => {
 
 // Optional: Create a more flexible middleware that allows optional authentication
 export const optionalAuthMiddleware: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook('preHandler', async (request, reply) => {
+  fastify.addHook('preHandler', async (request, _reply) => {
     try {
       const session = await auth.api.getSession({
-        headers: request.headers as any,
+        headers: new Headers(Object.entries(request.headers).map(([key, value]) => [
+          key,
+          Array.isArray(value) ? value.join(', ') : value || ''
+        ])),
       });
 
       if (session) {

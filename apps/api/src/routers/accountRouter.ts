@@ -16,7 +16,16 @@ const bankAccountSchema = createSelectSchema(bankAccount, {
       if (val === null || val === undefined) {
         return null;
       }
-      const parsed = typeof val === "string" ? Number(val) : val; // `Number` rejects "Infinity"
+      const parsed =
+        typeof val === "string"
+          ? val.trim() === "" // reject empty / whitespace-only strings
+            ? NaN
+            : Number(val)
+          : val;
+
+      if (!Number.isFinite(parsed)) {
+        return null;
+      }
       if (!Number.isFinite(parsed)) {
         return null; // Reject Infinity / -Infinity
       }

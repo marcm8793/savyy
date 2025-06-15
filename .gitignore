@@ -36,8 +36,6 @@ build/
 # IDE and Editor Files
 .vscode/settings.json
 .idea/
-*.swp
-*.swo
 
 # Testing
 coverage/

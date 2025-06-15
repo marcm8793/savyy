@@ -43,6 +43,12 @@ export function NavMain({
             defaultOpen={item.isActive}
             className="group/collapsible"
           >
+            {/* Main item loses navigability when no sub-items
+Every main entry is wrapped in a Collapsible, so items without
+items render a chevron but expand to nothing and cannot navigate to item.url. Consider:
+If item.items?.length, keep the current collapsible behaviour.
+Else, render a simple SidebarMenuItem with an <a> to item.url.
+This prevents dead-end clicks and keeps UX consistent. */}
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton tooltip={item.title}>

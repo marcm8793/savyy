@@ -2,8 +2,6 @@
 node_modules/
 npm-debug.log
 yarn-error.log
-yarn.lock
-package-lock.json
 
 # Environment Variables
 .env
@@ -17,10 +15,7 @@ dist/
 build/
 *.tsbuildinfo
 
-
-
-# Drizzle ORM Migrations (generated files)
-drizzle/migrations/*.sql
+# Drizzle ORM generated files
 drizzle/snapshots/
 
 # Logs

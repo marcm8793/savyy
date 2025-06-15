@@ -16,7 +16,6 @@ logs/
 # Node.js and npm
 node_modules/
 npm-debug.log
-package-lock.json
 
 
 # Environment Variables
@@ -33,3 +32,17 @@ build/
 
 # Turborepo
 .turbo/
+
+# IDE and Editor Files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Testing
+coverage/
+.nyc_output/
+
+# Miscellaneous
+*.tgz
+*.tar.gz

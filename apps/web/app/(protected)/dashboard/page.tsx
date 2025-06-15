@@ -1,0 +1,101 @@
+"use client";
+
+import { useSession } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { AppSidebar } from "@/components/app-sidebar";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+
+export default function DashboardPage() {
+  const { data: session, isPending } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    // Redirect to signin if not authenticated
+    if (!isPending && !session?.user) {
+      router.push("/signin");
+    }
+  }, [session, isPending, router]);
+
+  if (isPending) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!session?.user) {
+    return null; // Will redirect
+  }
+
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbLink href="#">Dashboard</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Overview</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <div className="text-sm text-muted-foreground">
+              Welcome back, {session.user.name || session.user.email}!
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="p-6 border rounded-lg">
+              <h3 className="text-lg font-semibold mb-2">Accounts</h3>
+              <p className="text-muted-foreground">Manage your bank accounts</p>
+            </div>
+
+            <div className="p-6 border rounded-lg">
+              <h3 className="text-lg font-semibold mb-2">Transactions</h3>
+              <p className="text-muted-foreground">
+                View your transaction history
+              </p>
+            </div>
+
+            <div className="p-6 border rounded-lg">
+              <h3 className="text-lg font-semibold mb-2">Analytics</h3>
+              <p className="text-muted-foreground">
+                Track your spending patterns
+              </p>
+            </div>
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}

@@ -1,7 +1,7 @@
-import { betterAuth } from 'better-auth';
-import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { createDatabase } from '../../db/db';
-import * as schema from '../../db/schema';
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createDatabase } from "../../db/db";
+import * as schema from "../../db/schema";
 
 // Create a dedicated database instance for Better Auth
 const { db } = createDatabase();
@@ -11,13 +11,29 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: process.env.CLIENT_ORIGIN
     ? [process.env.CLIENT_ORIGIN]
-    : ['http://localhost:3000'], // Default for development
+    : ["http://localhost:3000"], // Default for development
   database: drizzleAdapter(db, {
-    provider: 'pg',
+    provider: "pg",
     schema: schema,
   }),
   emailAndPassword: {
     enabled: true,
+  },
+  user: {
+    additionalFields: {
+      firstName: {
+        type: "string",
+        required: true,
+      },
+      lastName: {
+        type: "string",
+        required: true,
+      },
+      role: {
+        type: "string",
+        defaultValue: "user",
+      },
+    },
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days

@@ -12,7 +12,8 @@ const protectedRoutes: FastifyPluginAsync = async (fastify) => {
       message: "This is a protected route",
       user: {
         id: request.user?.id,
-        name: request.user?.name,
+        firstName: request.user?.firstName,
+        lastName: request.user?.lastName,
         email: request.user?.email,
       },
       session: {
@@ -28,7 +29,7 @@ const protectedRoutes: FastifyPluginAsync = async (fastify) => {
     }
     return {
       message: `Welcome to your dashboard, ${
-        request.user?.name || request.user?.email
+        request.user?.firstName || request.user?.email
       }!`,
       userId: request.user?.id,
     };

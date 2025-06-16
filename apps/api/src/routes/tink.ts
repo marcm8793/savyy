@@ -323,7 +323,7 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
           authToken.access_token,
           {
             userId: user.id,
-            idHint: user.name,
+            idHint: user.firstName || user.email,
           }
         );
 

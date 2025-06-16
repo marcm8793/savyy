@@ -75,8 +75,8 @@ export const authRouter = router({
   updateProfile: protectedProcedure
     .input(
       z.object({
-        firstName: z.string().optional(),
-        lastName: z.string().optional(),
+        firstName: z.string().trim().min(1).optional(),
+        lastName: z.string().trim().min(1).optional(),
         // Add other profile fields as needed
       })
     )

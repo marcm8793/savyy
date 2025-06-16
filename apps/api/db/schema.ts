@@ -19,6 +19,7 @@ export const user = pgTable("user", {
     .$defaultFn(() => false)
     .notNull(),
   image: text("image"),
+  role: varchar("role", { length: 50 }).default("user").notNull(),
   tinkUserId: text("tink_user_id"),
   createdAt: timestamp("created_at")
     .$defaultFn(() => /* @__PURE__ */ new Date())

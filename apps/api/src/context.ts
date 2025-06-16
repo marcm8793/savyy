@@ -14,10 +14,9 @@ export async function createContext({ req, res }: CreateFastifyContextOptions) {
     // Better Auth automatically handles cookies and session validation
     session = await auth.api.getSession({
       headers: new Headers(
-        Object.entries(req.headers).map(([key, value]) => [
-          key,
-          Array.isArray(value) ? value.join(", ") : String(value),
-        ])
+        Object.entries(req.headers)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v)])
       ),
     });
   } catch (error) {

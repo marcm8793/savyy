@@ -7,8 +7,11 @@ import {
   text,
   boolean,
   numeric,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { createSelectSchema, createInsertSchema } from "drizzle-zod";
+
+export const userRole = pgEnum("user_role", ["user", "admin"]);
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -19,7 +22,7 @@ export const user = pgTable("user", {
     .$defaultFn(() => false)
     .notNull(),
   image: text("image"),
-  role: varchar("role", { length: 50 }).default("user").notNull(),
+  role: userRole("role").default("user").notNull(),
   tinkUserId: text("tink_user_id"),
   createdAt: timestamp("created_at")
     .$defaultFn(() => /* @__PURE__ */ new Date())

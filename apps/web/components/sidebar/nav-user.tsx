@@ -99,7 +99,15 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => authClient.signOut()}>
+            <DropdownMenuItem
+              onClick={async () => {
+                try {
+                  await authClient.signOut();
+                } catch (error) {
+                  console.error("Error signing out:", error);
+                }
+              }}
+            >
               <LogOut />
               Log out
             </DropdownMenuItem>

@@ -45,16 +45,12 @@ export default function AccountsPage() {
   const {
     data: accounts,
     isLoading,
+    error,
     refetch,
   } = trpc.account.getAccountsFromDb.useQuery({
     limit: 50,
     offset: 0,
   });
-
-  // Debug logging
-  console.log("Accounts data:", accounts);
-  console.log("Is loading:", isLoading);
-  console.log("Accounts length:", accounts?.length);
 
   const { mutateAsync: connectBankAccount } =
     trpc.account.connectBankAccount.useMutation();
@@ -66,10 +62,24 @@ export default function AccountsPage() {
 
     if (connected === "true") {
       setConnectionStatus("success");
+      refetch();
     } else if (error) {
       setConnectionStatus("error");
     }
-  }, [searchParams]);
+  }, [searchParams, refetch]);
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-8 text-center text-red-600">
+        Failed to load accounts – please try again.
+      </div>
+    );
+  }
+
+  // Debug logging
+  console.log("Accounts data:", accounts);
+  console.log("Is loading:", isLoading);
+  console.log("Accounts length:", accounts?.length);
 
   const handleConnectBank = async () => {
     try {

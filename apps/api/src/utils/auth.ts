@@ -6,6 +6,50 @@ import * as schema from "../../db/schema";
 // Create a dedicated database instance for Better Auth
 const { db } = createDatabase();
 
+/**
+ * Utility function to split a full name into firstName and lastName with fallbacks
+ */
+export function splitNameWithFallbacks(
+  name?: string | null,
+  email?: string | null,
+  existingFirstName?: string | null,
+  existingLastName?: string | null
+): { firstName: string; lastName: string } {
+  let firstName = "";
+  let lastName = "";
+
+  // Try to split the provided name
+  if (name && name.trim()) {
+    const nameParts = name.trim().split(" ");
+    firstName = nameParts[0] || "";
+    lastName = nameParts.slice(1).join(" ") || "";
+  }
+
+  // Fallback to existing names if no new name provided
+  if (!firstName && existingFirstName) {
+    firstName = existingFirstName;
+  }
+  if (!lastName && existingLastName) {
+    lastName = existingLastName;
+  }
+
+  // Fallback to email-based name if firstName is still empty
+  if (!firstName && email) {
+    const emailParts = email.split("@")[0];
+    firstName = emailParts || "User";
+  }
+
+  // Ensure we always have at least default values
+  if (!firstName) {
+    firstName = "User";
+  }
+  if (!lastName) {
+    lastName = "Account";
+  }
+
+  return { firstName, lastName };
+}
+
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
@@ -40,21 +84,44 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          // Split the name field into firstName and lastName
-          if (user.name) {
-            const nameParts = user.name.split(" ");
-            const firstName = nameParts[0] || "";
-            const lastName = nameParts.slice(1).join(" ") || "";
+          // Use the utility function for consistent name handling
+          const { firstName, lastName } = splitNameWithFallbacks(
+            user.name,
+            user.email
+          );
 
-            return {
-              data: {
-                ...user,
-                firstName,
-                lastName,
-              },
-            };
-          }
-          return { data: user };
+          return {
+            data: {
+              ...user,
+              firstName,
+              lastName,
+            },
+          };
+        },
+      },
+      update: {
+        before: async (user) => {
+          // Cast user to include our additional fields
+          const userWithFields = user as typeof user & {
+            firstName?: string;
+            lastName?: string;
+          };
+
+          // Use the utility function for consistent name handling
+          const { firstName, lastName } = splitNameWithFallbacks(
+            user.name,
+            user.email,
+            userWithFields.firstName,
+            userWithFields.lastName
+          );
+
+          return {
+            data: {
+              ...user,
+              firstName,
+              lastName,
+            },
+          };
         },
       },
     },

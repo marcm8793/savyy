@@ -1,5 +1,7 @@
 import { z } from "zod/v4";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
+import { userService } from "../services/userService";
+import { createDatabase } from "../../db/db";
 
 // Auth schemas - these should match the user table constraints
 // email: text().notNull().unique() -> string with email validation
@@ -77,21 +79,34 @@ export const authRouter = router({
       z.object({
         firstName: z.string().trim().min(1).optional(),
         lastName: z.string().trim().min(1).optional(),
-        // Add other profile fields as needed
+        name: z.string().trim().min(1).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Here you would update the user in your database
-      // ctx.user and ctx.session are guaranteed to be non-null
+      const { db } = createDatabase();
 
-      // Example: Update user in database
-      // await ctx.db.update(users).set(input).where(eq(users.id, ctx.user.id));
+      try {
+        const updatedUser = await userService.updateUserProfile(
+          db,
+          ctx.user.id,
+          input
+        );
 
-      return {
-        message: "Profile updated successfully",
-        userId: ctx.user.id,
-        updates: input,
-      };
+        return {
+          message: "Profile updated successfully",
+          user: {
+            id: updatedUser.id,
+            name: updatedUser.name,
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            email: updatedUser.email,
+          },
+        };
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "Failed to update profile"
+        );
+      }
     }),
 
   // * Delete account - protected procedure

@@ -11,9 +11,9 @@ import {
   SquareTerminal,
 } from "lucide-react";
 
-import { NavMain } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
-import { NavUser } from "@/components/nav-user";
+import { NavMain } from "@/components/sidebar/nav-main";
+import { NavProjects } from "@/components/sidebar/nav-projects";
+import { NavUser } from "@/components/sidebar/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -25,14 +25,10 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
+import { useSession } from "@/lib/auth-client";
 
-// This is sample data.
+// This is sample data for navigation and projects - keeping this for non-user data
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   teams: [
     {
       name: "Acme Inc",
@@ -52,64 +48,48 @@ const data = {
   ],
   navMain: [
     {
-      title: "Playground",
-      url: "#",
+      title: "Dashboard",
+      url: "/dashboard",
       icon: SquareTerminal,
       isActive: true,
       items: [
         {
-          title: "History",
-          url: "#",
+          title: "Overview",
+          url: "/dashboard",
         },
         {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
+          title: "Analytics",
+          url: "/dashboard/analytics",
         },
       ],
     },
     {
-      title: "Models",
-      url: "#",
+      title: "Accounts",
+      url: "/accounts",
       icon: Bot,
       items: [
         {
-          title: "Genesis",
-          url: "#",
+          title: "Bank Accounts",
+          url: "/accounts",
         },
         {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
+          title: "Connect Account",
+          url: "/accounts/connect",
         },
       ],
     },
     {
-      title: "Documentation",
-      url: "#",
+      title: "Transactions",
+      url: "/transactions",
       icon: BookOpen,
       items: [
         {
-          title: "Introduction",
-          url: "#",
+          title: "All Transactions",
+          url: "/transactions",
         },
         {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
+          title: "Categories",
+          url: "/transactions/categories",
         },
       ],
     },
@@ -157,6 +137,21 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { data: session } = useSession();
+
+  // Create user data from session, with fallbacks for when session is loading or unavailable
+  const userData = session?.user
+    ? {
+        name: session.user.name || session.user.email || "User",
+        email: session.user.email || "",
+        avatar: session.user.image || "/avatars/default.jpg", // You can add a default avatar
+      }
+    : {
+        name: "Loading...",
+        email: "",
+        avatar: "/avatars/default.jpg",
+      };
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -169,7 +164,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
                   <span className="font-medium">Savyy</span>
-                  <span className="">v1.0.0</span>
+                  <span className="">Your money monitor</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -181,7 +176,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

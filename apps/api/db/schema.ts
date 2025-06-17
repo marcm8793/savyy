@@ -16,6 +16,7 @@ export const user = pgTable("user", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull().unique(),
@@ -191,7 +192,7 @@ export const transaction = pgTable("transactions", {
   providerMutability: varchar("provider_mutability", { length: 50 }), // providerMutability
 
   // Internal tracking
-  bankAccountId: integer("bank_account_id")
+  bankAccountId: text("bank_account_id")
     .notNull()
     .references(() => bankAccount.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at")

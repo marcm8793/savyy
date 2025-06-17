@@ -23,15 +23,39 @@ export const auth = betterAuth({
     additionalFields: {
       firstName: {
         type: "string",
-        required: true,
+        required: false, // Make it optional so we can set it via database hook
       },
       lastName: {
         type: "string",
-        required: true,
+        required: false, // Make it optional so we can set it via database hook
       },
       role: {
         type: "string",
         defaultValue: "user",
+        input: false, // Don't allow user to set role
+      },
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          // Split the name field into firstName and lastName
+          if (user.name) {
+            const nameParts = user.name.split(" ");
+            const firstName = nameParts[0] || "";
+            const lastName = nameParts.slice(1).join(" ") || "";
+
+            return {
+              data: {
+                ...user,
+                firstName,
+                lastName,
+              },
+            };
+          }
+          return { data: user };
+        },
       },
     },
   },

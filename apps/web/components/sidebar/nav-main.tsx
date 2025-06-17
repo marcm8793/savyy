@@ -34,7 +34,7 @@ export function NavMain({
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
           <Collapsible
@@ -43,7 +43,7 @@ export function NavMain({
             defaultOpen={item.isActive}
             className="group/collapsible"
           >
-            {/* Main item loses navigability when no sub-items
+            {/* TODO: Main item loses navigability when no sub-items
 Every main entry is wrapped in a Collapsible, so items without
 items render a chevron but expand to nothing and cannot navigate to item.url. Consider:
 If item.items?.length, keep the current collapsible behaviour.

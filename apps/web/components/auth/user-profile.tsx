@@ -48,7 +48,7 @@ export function UserProfile() {
   const handleUpdateProfile = () => {
     const newName = prompt("Enter new name:", session?.user?.name || "");
     if (newName && newName.trim()) {
-      updateProfileMutation.mutate({ name: newName.trim() });
+      updateProfileMutation.mutate({ firstName: newName.trim() });
     }
   };
 

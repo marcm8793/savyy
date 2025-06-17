@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/form";
 import { authClient } from "@/lib/auth-client";
 import Image from "next/image";
-import type { SignInFormData } from "@/types";
 import Link from "next/link";
 import { z } from "zod";
 
@@ -25,6 +24,11 @@ const signInSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
+
+type SignInFormData = {
+  email: string;
+  password: string;
+};
 
 export default function SignInForm() {
   const router = useRouter();
@@ -94,7 +98,7 @@ export default function SignInForm() {
                         <Input
                           {...field}
                           type="email"
-                          placeholder="m@example.com"
+                          placeholder="john@example.com"
                           disabled={isLoading}
                         />
                       </FormControl>
@@ -148,13 +152,13 @@ export default function SignInForm() {
               </div>
             </form>
           </Form>
-          <div className="bg-muted relative hidden md:block">
+          <div className="relative hidden bg-muted md:block">
             <Image
               src="/sign-in-icon.png"
-              alt="Image"
-              width={500}
-              height={500}
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.8] brightness-[0.9]"
+              alt="Sign in illustration"
+              width={1000}
+              height={1000}
+              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.8]"
             />
           </div>
         </CardContent>

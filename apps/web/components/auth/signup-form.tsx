@@ -27,9 +27,25 @@ type SignUpFormData = inferRouterInputs<AppRouter>["auth"]["signUp"];
 
 // Create a local version of the schema that matches the tRPC schema
 const signUpValidation = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  firstName: z
+    .string()
+    .min(1, "First name is required")
+    .max(50, "First name is too long")
+    .trim(),
+  lastName: z
+    .string()
+    .min(1, "Last name is required")
+    .max(50, "Last name is too long")
+    .trim(),
+  email: z
+    .string()
+    .email("Please enter a valid email address")
+    .max(255, "Email is too long")
+    .trim(),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .max(100, "Password is too long"),
 });
 
 export default function SignUpForm() {
@@ -40,7 +56,8 @@ export default function SignUpForm() {
   const form = useForm<SignUpFormData>({
     resolver: zodResolver(signUpValidation),
     defaultValues: {
-      name: "",
+      firstName: "",
+      lastName: "",
       email: "",
       password: "",
     },
@@ -53,7 +70,7 @@ export default function SignUpForm() {
     try {
       await authClient.signUp.email(
         {
-          name: data.name,
+          name: `${data.firstName} ${data.lastName}`,
           email: data.email,
           password: data.password,
         },
@@ -85,8 +102,8 @@ export default function SignUpForm() {
             <Image
               src="/sign-up-icon.png"
               alt="Image"
-              width={500}
-              height={500}
+              width={1000}
+              height={1000}
               className="absolute inset-0 h-full dark:brightness-[0.8] brightness-[0.9]"
             />
           </div>
@@ -100,24 +117,45 @@ export default function SignUpForm() {
                   </p>
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="text"
-                          placeholder="Enter your full name"
-                          disabled={isLoading}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="text"
+                            placeholder="John"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="text"
+                            placeholder="Doe"
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={form.control}
@@ -129,7 +167,7 @@ export default function SignUpForm() {
                         <Input
                           {...field}
                           type="email"
-                          placeholder="m@example.com"
+                          placeholder="john@example.com"
                           disabled={isLoading}
                         />
                       </FormControl>

@@ -144,13 +144,14 @@ export default function TransactionsPage() {
   const formatAmount = (
     amount: string,
     scale: number | null,
-    currency: string
+    currency: string,
+    defaultCurrency = "EUR" // TODO: or get from user config
   ) => {
     const numAmount = parseFloat(amount);
     const scaledAmount = numAmount / Math.pow(10, scale || 0);
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: currency || "EUR",
+      currency: currency || defaultCurrency,
     }).format(scaledAmount);
   };
 
@@ -169,7 +170,7 @@ export default function TransactionsPage() {
       const date =
         transaction.bookedDate ||
         transaction.transactionDate ||
-        format(new Date(), "yyyy-MM-dd");
+        format(parseISO(transaction.createdAt), "yyyy-MM-dd");
       if (!groups[date]) {
         groups[date] = [];
       }

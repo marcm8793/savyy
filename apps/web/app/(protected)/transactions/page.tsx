@@ -51,6 +51,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { ModeToggle } from "@/components/themes/mode-toggle";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 
 // Use the transaction type but with serialized dates (as they come from tRPC)
@@ -220,6 +221,9 @@ export default function TransactionsPage() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+          </div>
+          <div className="ml-auto px-4">
+            <ModeToggle />
           </div>
         </header>
 

@@ -35,6 +35,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { ModeToggle } from "@/components/themes/mode-toggle";
 
 export default function AccountsPage() {
   const searchParams = useSearchParams();
@@ -157,6 +158,9 @@ export default function AccountsPage() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+          </div>
+          <div className="ml-auto px-4">
+            <ModeToggle />
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">

@@ -18,6 +18,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { ModeToggle } from "@/components/themes/mode-toggle";
 
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
@@ -64,6 +65,9 @@ export default function DashboardPage() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+          </div>
+          <div className="ml-auto px-4">
+            <ModeToggle />
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">

@@ -323,21 +323,30 @@ export const accountRouter = router({
           });
         }
 
-        // Check token expiration
-        if (account.tokenExpiresAt && account.tokenExpiresAt < new Date()) {
+        // Check token expiration and refresh if needed
+        const tokenResult = await tokenService.refreshUserTokenIfNeeded(
+          ctx.db,
+          ctx.user.id,
+          account.tinkAccountId
+        );
+
+        if (!tokenResult) {
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message:
-              "Access token has expired. Please reconnect your bank account.",
+              "Access token has expired and could not be refreshed. Please reconnect your bank account.",
           });
         }
+
+        // Use the refreshed account
+        const refreshedAccount = tokenResult.account;
 
         const transactionSyncService = new TransactionSyncService();
         const syncResult = await transactionSyncService.syncInitialTransactions(
           ctx.db,
           ctx.user.id,
           input.accountId,
-          account.accessToken,
+          refreshedAccount.accessToken!,
           {
             dateRangeMonths: input.dateRangeMonths,
             includeAllStatuses: input.includeAllStatuses,

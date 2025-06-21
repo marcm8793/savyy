@@ -3,9 +3,10 @@ import { router, protectedProcedure, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { eq, and, gte, lte, inArray, desc, sql } from "drizzle-orm";
 import { transaction, bankAccount, schema } from "../../db/schema";
-
-import crypto from "crypto";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { tinkService } from "../services/tinkService";
+import { TinkWebhookService } from "../services/tinkWebhookService";
+import { tokenService } from "../services/tokenService";
 
 // Tink API response types
 interface TinkTransaction {
@@ -68,13 +69,10 @@ const transactionFiltersSchema = z.object({
   pageToken: z.string().optional(),
 });
 
-const webhookPayloadSchema = z.object({
-  event: z.string(),
-  userId: z.string(),
-  credentialsId: z.string().optional(),
-  accountIds: z.array(z.string()).optional(),
-  timestamp: z.number(),
-  signature: z.string(),
+const webhookSetupSchema = z.object({
+  webhookUrl: z.string().url(),
+  description: z.string().optional(),
+  enabledEvents: z.array(z.string()).optional(),
 });
 
 const refreshCredentialsSchema = z.object({
@@ -96,26 +94,7 @@ const syncTransactionsSchema = z.object({
   force: z.boolean().default(false),
 });
 
-// Security: Webhook signature verification
-function verifyWebhookSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  const expectedSignature = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex");
-
-  // Use constant-time comparison to prevent timing attacks
-  if (signature.length !== expectedSignature.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(
-    Buffer.from(signature, "hex"),
-    Buffer.from(expectedSignature, "hex")
-  );
-}
+// Note: Webhook signature verification moved to TinkWebhookService
 
 // Transaction storage with bulk upsert strategy to eliminate N+1 queries
 async function storeTransactionsWithUpsert(
@@ -137,7 +116,7 @@ async function storeTransactionsWithUpsert(
       await db.transaction(async (tx: NodePgDatabase<typeof schema>) => {
         // First, get all bank account IDs for this batch in a single query
         const accountIds = [...new Set(batch.map((tx) => tx.accountId))];
-        const bankAccountMap = new Map<string, number>();
+        const bankAccountMap = new Map<string, string>();
 
         const bankAccounts = await tx
           .select({
@@ -308,11 +287,31 @@ async function fetchTinkTransactions(
   return (await response.json()) as TinkTransactionsResponse;
 }
 
-// Refresh credentials data
+// Refresh credentials data by generating a fresh user token with credentials:refresh scope
 async function refreshCredentialsData(
   credentialsId: string,
-  userAccessToken: string
+  userId: string
 ): Promise<void> {
+  console.log(
+    "Generating fresh user access token with credentials:refresh scope"
+  );
+
+  // Generate a fresh user access token with credentials:refresh scope
+  const freshUserToken = await tinkService.getUserAccessTokenFlow({
+    tinkUserId: userId,
+    scope:
+      "accounts:read,balances:read,transactions:read,credentials:refresh,credentials:read,credentials:write",
+  });
+
+  console.log("Fresh user token generated:", {
+    credentialsId,
+    tokenType: freshUserToken.token_type,
+    scope: freshUserToken.scope,
+    hasToken: !!freshUserToken.access_token,
+    expiresIn: freshUserToken.expires_in,
+  });
+
+  // Use the fresh user token for refresh
   const baseUrl = process.env.TINK_API_URL || "https://api.tink.com";
 
   const response = await fetch(
@@ -320,7 +319,7 @@ async function refreshCredentialsData(
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${userAccessToken}`,
+        Authorization: `Bearer ${freshUserToken.access_token}`,
         "Content-Type": "application/json",
       },
     }
@@ -332,6 +331,10 @@ async function refreshCredentialsData(
       `Failed to refresh credentials: ${response.status} ${errorText}`
     );
   }
+
+  console.log(
+    `Credentials ${credentialsId} refreshed successfully with fresh user token`
+  );
 }
 
 export const transactionRouter = router({
@@ -490,14 +493,23 @@ export const transactionRouter = router({
               continue;
             }
 
-            // Check token expiration
-            if (account.tokenExpiresAt && account.tokenExpiresAt < new Date()) {
+            // Check token expiration and refresh if needed
+            const tokenResult = await tokenService.refreshUserTokenIfNeeded(
+              db,
+              user.id,
+              account.tinkAccountId
+            );
+
+            if (!tokenResult) {
               console.warn(
-                `Access token expired for account ${account.tinkAccountId}`
+                `Access token expired and could not be refreshed for account ${account.tinkAccountId}`
               );
               totalErrors++;
               continue;
             }
+
+            // Use the refreshed token
+            const refreshedAccount = tokenResult.account;
 
             // Set up date range (default to last year)
             const dateRange = input.dateRange || {
@@ -515,9 +527,9 @@ export const transactionRouter = router({
 
             do {
               const response = await fetchTinkTransactions(
-                account.accessToken,
+                refreshedAccount.accessToken!,
                 {
-                  accountIdIn: [account.tinkAccountId],
+                  accountIdIn: [refreshedAccount.tinkAccountId],
                   statusIn: ["BOOKED", "PENDING", "UNDEFINED"],
                   bookedDateGte: dateRange.from,
                   bookedDateLte: dateRange.to,
@@ -557,7 +569,7 @@ export const transactionRouter = router({
                 lastRefreshed: new Date(),
                 updatedAt: new Date(),
               })
-              .where(eq(bankAccount.id, account.id));
+              .where(eq(bankAccount.id, refreshedAccount.id));
           } catch (error) {
             console.error(
               `Error syncing account ${account.tinkAccountId}:`,
@@ -588,25 +600,20 @@ export const transactionRouter = router({
     }),
 
   // Refresh credentials (trigger Tink to fetch fresh data)
-  // TODO: Credentials vs. account id confusion
-  // refreshCredentials looks up the record by tinkAccountId but then sends credentialsId to
-  // POST /credentials/{id}/refresh. Tink's credentials id ≠ account id – the request will 404 for most banks.
-
-  // Add a dedicated credentialsId column on bankAccount (already stored by Tink) or query credentials table instead.
   refreshCredentials: protectedProcedure
     .input(refreshCredentialsSchema)
     .mutation(async ({ ctx, input }) => {
       try {
         const { db, user } = ctx;
 
-        // Get user's bank account with the credentials
+        // Get user's bank account by credentialsId (fixed from previous bug)
         const account = await db
           .select()
           .from(bankAccount)
           .where(
             and(
               eq(bankAccount.userId, user.id),
-              eq(bankAccount.tinkAccountId, input.credentialsId)
+              eq(bankAccount.credentialsId, input.credentialsId)
             )
           )
           .limit(1);
@@ -614,11 +621,19 @@ export const transactionRouter = router({
         if (account.length === 0) {
           throw new TRPCError({
             code: "NOT_FOUND",
-            message: "Bank account not found",
+            message: "Bank account not found for the provided credentials ID",
           });
         }
 
-        const bankAcc = account[0];
+        let bankAcc = account[0];
+
+        if (!bankAcc.credentialsId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "No credentials ID stored for this account. Please reconnect your bank account.",
+          });
+        }
 
         if (!bankAcc.accessToken) {
           throw new TRPCError({
@@ -627,17 +642,41 @@ export const transactionRouter = router({
           });
         }
 
-        // Check token expiration
-        if (bankAcc.tokenExpiresAt && bankAcc.tokenExpiresAt < new Date()) {
+        // Check token expiration and refresh if needed
+        const tokenResult = await tokenService.refreshUserTokenIfNeeded(
+          db,
+          user.id,
+          bankAcc.tinkAccountId
+        );
+
+        if (!tokenResult) {
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message:
-              "Access token has expired. Please reconnect your bank account.",
+              "Your bank connection has expired and needs to be renewed. Please reconnect your bank account to continue accessing your financial data.",
           });
         }
 
-        // Trigger refresh at Tink
-        await refreshCredentialsData(input.credentialsId, bankAcc.accessToken);
+        // Update bankAcc with fresh token
+        bankAcc = tokenResult.account;
+
+        // Debug: Log token info before refresh
+        console.log("Debug - Token info:", {
+          credentialsId: bankAcc.credentialsId,
+          hasAccessToken: !!bankAcc.accessToken,
+          tokenScope: bankAcc.tokenScope,
+          tokenExpiresAt: bankAcc.tokenExpiresAt,
+          tokenLength: bankAcc.accessToken?.length,
+        });
+
+        // Trigger refresh at Tink using the correct credentialsId and fresh user token
+        if (!bankAcc.credentialsId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No credentials ID available after token refresh",
+          });
+        }
+        await refreshCredentialsData(bankAcc.credentialsId, user.id);
 
         return {
           success: true,
@@ -658,93 +697,32 @@ export const transactionRouter = router({
       }
     }),
 
-  // Webhook endpoint for Tink notifications
-  webhook: publicProcedure
-    .input(webhookPayloadSchema)
-    .mutation(async ({ ctx, input }) => {
+  // Setup webhook endpoint with Tink (admin function)
+  setupWebhook: publicProcedure
+    .input(webhookSetupSchema)
+    .mutation(async ({ input }) => {
       try {
-        const webhookSecret = process.env.TINK_WEBHOOK_SECRET;
-        if (!webhookSecret) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Webhook secret not configured",
-          });
-        }
+        const webhookService = new TinkWebhookService();
 
-        // Verify webhook signature for security
-        const payload = JSON.stringify(input);
-        if (!verifyWebhookSignature(payload, input.signature, webhookSecret)) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Invalid webhook signature",
-          });
-        }
-
-        // Check timestamp to prevent replay attacks (5 minute window)
-        const now = Date.now();
-        const webhookTime = input.timestamp;
-        if (Math.abs(now - webhookTime) > 5 * 60 * 1000) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Webhook timestamp too old",
-          });
-        }
-
-        const { db } = ctx;
-
-        // Handle different webhook events
-        switch (input.event) {
-          case "credentials.update":
-          case "accounts.update":
-          case "transactions.update": {
-            // Find user by external ID
-            const userResult = await db
-              .select()
-              .from(bankAccount)
-              .where(eq(bankAccount.userId, input.userId))
-              .limit(1);
-
-            if (userResult.length === 0) {
-              console.warn(`User not found for webhook: ${input.userId}`);
-              return {
-                success: true,
-                message: "User not found, ignoring webhook",
-              };
-            }
-
-            // Trigger automatic sync for affected accounts
-            if (input.accountIds && input.accountIds.length > 0) {
-              // This would typically be handled by a background job
-              // For now, we'll just log it
-              console.log(
-                `Webhook received for accounts: ${input.accountIds.join(", ")}`
-              );
-
-              // In production, you might want to:
-              // 1. Queue a background job to sync these accounts
-              // 2. Send a real-time notification to the user
-              // 3. Update account status in database
-            }
-            break;
-          }
-
-          default:
-            console.log(`Unhandled webhook event: ${input.event}`);
-        }
+        const webhookResponse = await webhookService.createWebhookEndpoint(
+          input.webhookUrl,
+          input.description,
+          input.enabledEvents
+        );
 
         return {
           success: true,
-          message: "Webhook processed successfully",
+          webhookId: webhookResponse.id,
+          secret: webhookResponse.secret,
+          enabledEvents: webhookResponse.enabledEvents,
+          message: "Webhook endpoint created successfully",
         };
       } catch (error) {
-        if (error instanceof TRPCError) {
-          throw error;
-        }
-
-        console.error("Error processing webhook:", error);
+        console.error("Error setting up webhook:", error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to process webhook",
+          message: "Failed to setup webhook",
+          cause: error,
         });
       }
     }),

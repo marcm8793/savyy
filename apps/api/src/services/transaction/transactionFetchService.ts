@@ -1,6 +1,9 @@
 import { TinkService } from "../tinkService";
 import { TinkTransactionsResponse, DateRange } from "./types";
 import { httpRetry } from "../../utils/httpRetry";
+import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { eq, and } from "drizzle-orm";
+import { schema, bankAccount } from "../../../db/schema";
 
 /**
  * Service responsible for fetching transactions from Tink API
@@ -113,7 +116,7 @@ export class TransactionFetchService {
     credentialsId: string,
     userAccessToken: string
   ): Promise<void> {
-    const url = `${this.baseUrl}/data/v2/credentials/${credentialsId}/refresh`;
+    const url = `${this.baseUrl}/api/v1/credentials/${credentialsId}/refresh`;
     const context = `Refresh credentials ${credentialsId}`;
 
     const response = await httpRetry.fetchWithRetry(
@@ -146,7 +149,7 @@ export class TransactionFetchService {
     credentialsId: string,
     authToken: string
   ): Promise<void> {
-    const url = `${this.baseUrl}/data/v2/credentials/${credentialsId}/refresh`;
+    const url = `${this.baseUrl}/api/v1/credentials/${credentialsId}/refresh`;
     const context = `Refresh credentials ${credentialsId} with auth token`;
 
     const response = await httpRetry.fetchWithRetry(
@@ -178,6 +181,8 @@ export class TransactionFetchService {
    * Returns true if successful, false if failed (but allows continuation)
    */
   async tryRefreshCredentials(
+    db: NodePgDatabase<typeof schema>,
+    userId: string,
     tinkAccountId: string,
     skipCredentialsRefresh: boolean = false
   ): Promise<boolean> {
@@ -187,31 +192,56 @@ export class TransactionFetchService {
       );
       return true;
     }
-    //TODO: Possible credentials mis-mapping
-    // refreshCredentialsWithAuthToken is invoked with tinkAccountId, but the Tink endpoint expects a credentials ID, not an account ID. If those IDs differ, refresh will 404 and silently fall back to stale data.
-    // 3. Optionally refresh credentials to get fresher data
-    //       Credentials refresh is called with an account ID, not credentials ID.
-    // refreshCredentialsWithAuthToken(tinkAccountId, …) passes a bank‐account ID to the /credentials/:id/refresh endpoint, which expects credentialsId.
-    // Result: 404 → stale data despite "success" log.
 
-    // Pass the correct credentialsId (often available on the bankAccount row) or map account → credentials before calling.
     try {
-      // Try to refresh credentials with authorization grant token
+      // First, look up the credentialsId from the database
+      const bankAccountResult = await db
+        .select({
+          credentialsId: bankAccount.credentialsId,
+        })
+        .from(bankAccount)
+        .where(
+          and(
+            eq(bankAccount.tinkAccountId, tinkAccountId),
+            eq(bankAccount.userId, userId)
+          )
+        )
+        .limit(1);
+
+      if (bankAccountResult.length === 0) {
+        console.warn(
+          `Bank account ${tinkAccountId} not found for user ${userId}`
+        );
+        return false;
+      }
+
+      const credentialsId = bankAccountResult[0].credentialsId;
+
+      if (!credentialsId) {
+        console.warn(
+          `No credentialsId stored for account ${tinkAccountId}. Skipping refresh.`
+        );
+        return false;
+      }
+
+      // Try to refresh credentials with authorization grant token using correct credentialsId
       const authToken = await this.tinkService.getAuthorizationGrantToken();
       await this.refreshCredentialsWithAuthToken(
-        tinkAccountId,
+        credentialsId,
         authToken.access_token
       );
 
       // Wait a bit for Tink to process the refresh
       await this.sleep(2000);
-      console.log(`Credentials refreshed successfully for ${tinkAccountId}`);
+      console.log(
+        `Credentials ${credentialsId} refreshed successfully for account ${tinkAccountId}`
+      );
       return true;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       console.warn(
-        `Failed to refresh credentials for ${tinkAccountId}, continuing with existing data:`,
+        `Failed to refresh credentials for account ${tinkAccountId}, continuing with existing data:`,
         errorMessage
       );
       // Continue without refresh - we can still fetch transactions

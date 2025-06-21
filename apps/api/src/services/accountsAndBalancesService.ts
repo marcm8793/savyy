@@ -252,7 +252,8 @@ export class AccountsAndBalancesService {
     userId: string,
     userAccessToken: string,
     tokenScope?: string,
-    expiresIn?: number
+    expiresIn?: number,
+    credentialsId?: string
   ): Promise<{ accounts: BankAccount[]; count: number }> {
     console.log("Syncing accounts and balances for user:", userId);
 
@@ -269,6 +270,7 @@ export class AccountsAndBalancesService {
       accountName: account.name,
       accountType: account.type,
       financialInstitutionId: account.financialInstitutionId,
+      credentialsId: credentialsId, // Store credentials ID for refresh operations
       balance: account.processedBalance
         ? Math.round(account.processedBalance.amount * 100).toString() // Convert to cents
         : null,

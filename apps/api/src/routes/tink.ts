@@ -26,6 +26,7 @@ const callbackQuerySchema = z.object({
   code: z.string().optional(),
   state: z.string().optional(),
   error: z.string().optional(),
+  credentialsId: z.string().optional(), // Alternative format that Tink sometimes uses
 });
 
 const tinkRoutes: FastifyPluginAsync = async (fastify) => {
@@ -44,7 +45,9 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.redirect(`${clientUrl}/accounts?error=invalid_parameters`);
       }
 
-      const { code, state, error } = queryResult.data;
+      const { code, state, error, credentialsId } = queryResult.data;
+
+      // Use whichever credentials ID format Tink provided
 
       if (error) {
         fastify.log.error({ error }, "Tink OAuth error");
@@ -121,7 +124,8 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
               String(stateData.userId),
               tokenResponse.access_token,
               tokenResponse.scope,
-              tokenResponse.expires_in
+              tokenResponse.expires_in,
+              credentialsId as string
             );
 
             fastify.log.info("Accounts synced successfully", {

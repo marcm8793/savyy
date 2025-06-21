@@ -27,6 +27,142 @@ export class TokenService {
   }
 
   /**
+   * Check if user's Tink session is still valid
+   * This helps determine if automatic refresh is possible
+   */
+  async checkTinkSessionValidity(userId: string): Promise<boolean> {
+    try {
+      // Import TinkService dynamically to avoid circular dependencies
+      const { TinkService } = await import("./tinkService.js");
+      const tinkService = new TinkService();
+
+      // Try to get authorization grant token and generate user auth code
+      const authToken = await tinkService.getAuthorizationGrantToken();
+      await tinkService.generateUserAuthorizationCode(authToken.access_token, {
+        tinkUserId: userId,
+        scope: "accounts:read", // Minimal scope for testing
+      });
+
+      return true; // If we get here, session is valid
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (
+        errorMessage.includes("User ID does not exist") ||
+        errorMessage.includes("oauth.user_id_does_not_exist")
+      ) {
+        return false; // Session expired
+      }
+
+      // Other errors might be temporary, assume session is valid
+      console.warn("Unexpected error checking Tink session validity:", error);
+      return true;
+    }
+  }
+
+  /**
+   * Automatically refresh user access token if expired
+   * Returns a fresh token or the existing one if still valid
+   */
+  async refreshUserTokenIfNeeded(
+    db: NodePgDatabase<typeof schema>,
+    userId: string,
+    tinkAccountId?: string
+  ): Promise<{ accessToken: string; account: BankAccount } | null> {
+    try {
+      // Import TinkService dynamically to avoid circular dependencies
+      const { TinkService } = await import("./tinkService.js");
+
+      // Check current token validity
+      const tokenCheck = await this.isUserTokenValid(db, userId, tinkAccountId);
+
+      if (tokenCheck.isValid && tokenCheck.account) {
+        // Token is still valid, return it
+        return {
+          accessToken: tokenCheck.account.accessToken!,
+          account: tokenCheck.account,
+        };
+      }
+
+      if (!tokenCheck.account) {
+        console.error("No bank account found for user:", userId);
+        return null;
+      }
+
+      console.log("Token expired or invalid, attempting refresh...", {
+        userId,
+        reason: tokenCheck.reason,
+        expiresAt: tokenCheck.account.tokenExpiresAt,
+      });
+
+      // Check if Tink session is still valid before attempting refresh
+      const sessionValid = await this.checkTinkSessionValidity(userId);
+      if (!sessionValid) {
+        console.log(
+          "User's Tink session has expired - automatic refresh not possible"
+        );
+        return null;
+      }
+
+      // Generate fresh user access token with credentials:refresh scope
+      const tinkService = new TinkService();
+      const freshTokenResponse = await tinkService.getUserAccessTokenFlow({
+        tinkUserId: userId,
+        scope:
+          "credentials:refresh,accounts:read,balances:read,transactions:read,provider-consents:read",
+      });
+
+      // Calculate expiration time
+      const expiresAt = new Date(
+        Date.now() + freshTokenResponse.expires_in * 1000
+      );
+
+      // Update the stored token
+      const updatedAccounts = await db
+        .update(bankAccount)
+        .set({
+          accessToken: freshTokenResponse.access_token,
+          tokenExpiresAt: expiresAt,
+          tokenScope: freshTokenResponse.scope,
+        })
+        .where(eq(bankAccount.id, tokenCheck.account.id))
+        .returning();
+
+      if (updatedAccounts.length === 0) {
+        console.error("Failed to update token in database");
+        return null;
+      }
+
+      console.log("Token refreshed successfully", {
+        userId,
+        newExpiresAt: expiresAt,
+        scope: freshTokenResponse.scope,
+      });
+
+      return {
+        accessToken: freshTokenResponse.access_token,
+        account: updatedAccounts[0],
+      };
+    } catch (error) {
+      console.error("Failed to refresh user token:", error);
+
+      // Check if this is a session expiration vs other error
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (
+        errorMessage.includes("User ID does not exist") ||
+        errorMessage.includes("oauth.user_id_does_not_exist")
+      ) {
+        console.log(
+          "User's Tink session has expired completely - reconnection required"
+        );
+      }
+
+      return null;
+    }
+  }
+
+  /**
    * Check if user's stored token is still valid
    * Returns true if token exists and is not expired
    */

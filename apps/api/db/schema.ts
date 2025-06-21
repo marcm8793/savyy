@@ -97,6 +97,8 @@ export const bankAccount = pgTable("bank_accounts", {
   accountName: varchar("account_name", { length: 255 }).notNull(), // name from API
   accountType: varchar("account_type", { length: 100 }), // type from API (CHECKING, SAVINGS, etc.)
   financialInstitutionId: varchar("financial_institution_id", { length: 255 }), // financialInstitutionId from API
+  // Credentials information (from Tink callback URL)
+  credentialsId: varchar("credentials_id", { length: 255 }), // credentials_id from callback URL - needed for refresh operations
   balance: numeric("balance"), // Store balance in cents (from balances.booked.amount)
   currency: varchar("currency", { length: 3 }).default("EUR"), // from balances.booked.amount.currencyCode
   iban: varchar("iban", { length: 34 }), // from identifiers.iban.iban

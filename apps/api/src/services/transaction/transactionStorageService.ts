@@ -17,7 +17,7 @@ export class TransactionStorageService {
   async storeTransactionsWithUpsert(
     db: NodePgDatabase<typeof schema>,
     userId: string,
-    bankAccountId: number,
+    bankAccountId: string,
     tinkTransactions: TinkTransaction[]
   ): Promise<StorageResult> {
     const errors: string[] = [];
@@ -123,7 +123,7 @@ export class TransactionStorageService {
    */
   async updateAccountLastRefreshed(
     db: NodePgDatabase<typeof schema>,
-    bankAccountId: number
+    bankAccountId: string
   ): Promise<void> {
     await db
       .update(bankAccount)

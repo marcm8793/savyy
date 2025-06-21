@@ -72,6 +72,8 @@ export class TransactionSyncService {
 
       // Pass the correct credentialsId (often available on the bankAccount row) or map account → credentials before calling.
       await this.fetchService.tryRefreshCredentials(
+        db,
+        userId,
         tinkAccountId,
         skipCredentialsRefresh
       );
@@ -133,6 +135,103 @@ export class TransactionSyncService {
         error instanceof Error ? error.message : "Unknown error";
       console.error(
         `Error in initial transaction sync for account ${tinkAccountId}:`,
+        error
+      );
+
+      result.errors.push(errorMessage);
+      return result;
+    }
+  }
+
+  /**
+   * Sync transactions for a specific date range (used by webhooks)
+   * This is called when webhook events indicate transaction changes
+   */
+  async syncTransactionsForDateRange(
+    db: NodePgDatabase<typeof schema>,
+    userId: string,
+    tinkAccountId: string,
+    userAccessToken: string,
+    dateRange: DateRange
+  ): Promise<SyncResult> {
+    console.log(
+      `Starting webhook-triggered transaction sync for account ${tinkAccountId}, date range: ${dateRange.from} to ${dateRange.to}`
+    );
+
+    const result: SyncResult = {
+      success: false,
+      accountId: tinkAccountId,
+      transactionsCreated: 0,
+      transactionsUpdated: 0,
+      errors: [],
+      totalTransactionsFetched: 0,
+    };
+
+    try {
+      // 1. Verify bank account exists and belongs to user
+      const bankAcc = await this.storageService.verifyBankAccount(
+        db,
+        userId,
+        tinkAccountId
+      );
+
+      // 2. Fetch and process transactions for the specific date range
+      let totalCreated = 0;
+      let totalUpdated = 0;
+      const allErrors: string[] = [];
+
+      for await (const page of this.fetchService.fetchPagedTransactions(
+        userAccessToken,
+        tinkAccountId,
+        dateRange,
+        true // include all statuses
+      )) {
+        result.totalTransactionsFetched += page.transactions.length;
+
+        // Process this page immediately to avoid memory buildup
+        const storeResult =
+          await this.storageService.storeTransactionsWithUpsert(
+            db,
+            userId,
+            bankAcc.id,
+            page.transactions
+          );
+
+        totalCreated += storeResult.created;
+        totalUpdated += storeResult.updated;
+        allErrors.push(...storeResult.errors);
+
+        console.log(
+          `Processed page: ${storeResult.created} created, ${storeResult.updated} updated, ${storeResult.errors.length} errors`
+        );
+      }
+
+      result.transactionsCreated = totalCreated;
+      result.transactionsUpdated = totalUpdated;
+      result.errors = allErrors;
+
+      // 3. Update bank account's last refreshed timestamp
+      await this.storageService.updateAccountLastRefreshed(db, bankAcc.id);
+
+      result.success = true;
+
+      console.log(
+        `Webhook-triggered sync completed for account ${tinkAccountId}:`,
+        {
+          created: result.transactionsCreated,
+          updated: result.transactionsUpdated,
+          errors: result.errors.length,
+          totalFetched: result.totalTransactionsFetched,
+          dateRange,
+        }
+      );
+
+      return result;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error(
+        `Error in webhook-triggered transaction sync for account ${tinkAccountId}:`,
         error
       );
 

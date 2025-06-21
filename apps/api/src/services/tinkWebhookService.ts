@@ -90,10 +90,15 @@ export class TinkWebhookService {
    * Requires webhook-endpoints scope for webhook management
    */
   async getWebhookClientAccessToken(): Promise<string> {
+    if (!process.env.TINK_CLIENT_ID || !process.env.TINK_CLIENT_SECRET) {
+      throw new Error(
+        "Missing required environment variables: TINK_CLIENT_ID and TINK_CLIENT_SECRET"
+      );
+    }
     const requestBody = new URLSearchParams({
       grant_type: "client_credentials",
-      client_id: process.env.TINK_CLIENT_ID!,
-      client_secret: process.env.TINK_CLIENT_SECRET!,
+      client_id: process.env.TINK_CLIENT_ID,
+      client_secret: process.env.TINK_CLIENT_SECRET,
       scope: "authorization:grant,user:create webhook-endpoints",
     });
 
@@ -182,7 +187,6 @@ export class TinkWebhookService {
    */
   verifyWebhookSignature(
     signature: string,
-    timestamp: string,
     requestBody: string,
     secret: string
   ): boolean {

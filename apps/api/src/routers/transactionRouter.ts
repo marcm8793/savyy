@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure, publicProcedure } from "../trpc";
+import { router, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { eq, and, gte, lte, inArray, desc, sql } from "drizzle-orm";
 import { transaction, bankAccount, schema } from "../../db/schema";
@@ -698,7 +698,7 @@ export const transactionRouter = router({
     }),
 
   // Setup webhook endpoint with Tink (admin function)
-  setupWebhook: publicProcedure
+  setupWebhook: protectedProcedure
     .input(webhookSetupSchema)
     .mutation(async ({ input }) => {
       try {

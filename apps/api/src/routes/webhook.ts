@@ -45,7 +45,6 @@ const webhookRoutes: FastifyPluginAsync = async (fastify) => {
         // Verify webhook signature
         const isValidSignature = webhookService.verifyWebhookSignature(
           signature,
-          "", // timestamp is extracted from signature header
           requestBodyString,
           webhookSecret
         );
@@ -192,8 +191,11 @@ const webhookRoutes: FastifyPluginAsync = async (fastify) => {
               void (async () => {
                 for (const account of bankAccounts) {
                   try {
-                    // Get user access token (you might need to implement token retrieval)
+                    // TODO: Get user access token (you might need to implement token retrieval)
                     // For now, we'll skip the sync as it requires user access token
+                    // Storing and retrieving user access tokens securely
+                    // Using the token refresh logic from tokenService
+                    // Implementing proper token management
                     fastify.log.info(
                       "Skipping transaction sync - user access token required",
                       {
@@ -391,7 +393,7 @@ const webhookRoutes: FastifyPluginAsync = async (fastify) => {
     const deletedIds = content.transactions?.ids;
     if (deletedIds && deletedIds.length > 0) {
       try {
-        // You would implement transaction deletion logic here
+        // TODO: You would implement transaction deletion logic here
         // For example, soft delete or remove from database
         fastify.log.info("Would delete transactions", {
           transactionIds: deletedIds,

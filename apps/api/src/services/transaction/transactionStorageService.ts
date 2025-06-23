@@ -83,9 +83,9 @@ export class TransactionStorageService {
                 status: sql`EXCLUDED.status`,
                 // Only update statusLastUpdated if status actually changed
                 statusLastUpdated: sql`CASE
-                  WHEN transactions.status != EXCLUDED.status
+                  WHEN ${transaction}.status != EXCLUDED.status
                   THEN EXCLUDED.status_last_updated
-                  ELSE transactions.status_last_updated
+                  ELSE ${transaction}.status_last_updated
                 END`,
                 amount: sql`EXCLUDED.amount`,
                 amountScale: sql`EXCLUDED.amount_scale`,

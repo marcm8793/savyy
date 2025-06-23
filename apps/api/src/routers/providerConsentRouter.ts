@@ -321,6 +321,7 @@ export const providerConsentRouter = router({
     }),
 
   // Generate URL for extending a consent
+  // TODO: refactor significant code duplication with getUpdateConsentUrl.
   getExtendConsentUrl: protectedProcedure
     .input(extendConsentSchema)
     .mutation(async ({ ctx, input }) => {

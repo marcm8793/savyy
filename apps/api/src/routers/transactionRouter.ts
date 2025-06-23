@@ -660,6 +660,83 @@ export const transactionRouter = router({
         // Update bankAcc with fresh token
         bankAcc = tokenResult.account;
 
+        // Check provider consent status before attempting refresh
+        // Only check if the token has the required scope
+        const hasConsentScope = tokenResult.account.tokenScope?.includes(
+          "provider-consents:read"
+        );
+
+        if (hasConsentScope) {
+          try {
+            const consent = await tinkService.getConsentByCredentialsId(
+              tokenResult.accessToken,
+              bankAcc.credentialsId!
+            );
+
+            if (!consent) {
+              console.warn(
+                "Provider consent not found, but proceeding with refresh"
+              );
+            } else {
+              // Check if consent needs updating
+              if (tinkService.isConsentUpdateNeeded(consent)) {
+                const consentStatus = consent.status;
+                const errorMessage = consent.detailedError?.displayMessage;
+                const sessionExpired = consent.sessionExpiryDate < Date.now();
+
+                let message = "Your bank connection needs to be updated. ";
+
+                if (sessionExpired) {
+                  message += "The session has expired.";
+                } else if (errorMessage) {
+                  message += `Bank error: ${errorMessage}`;
+                } else {
+                  message += `Connection status: ${consentStatus}`;
+                }
+
+                message +=
+                  " Please use the 'Update Connection' option to refresh your bank connection.";
+
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message,
+                  cause: {
+                    consentStatus,
+                    needsUpdate: true,
+                    sessionExpired,
+                    detailedError: consent.detailedError,
+                  },
+                });
+              }
+
+              console.log(
+                "Provider consent is valid, proceeding with refresh:",
+                {
+                  credentialsId: bankAcc.credentialsId,
+                  consentStatus: consent.status,
+                  sessionExpiryDate: new Date(
+                    consent.sessionExpiryDate
+                  ).toISOString(),
+                }
+              );
+            }
+          } catch (consentError) {
+            if (consentError instanceof TRPCError) {
+              throw consentError;
+            }
+
+            console.warn(
+              "Could not check provider consent, proceeding with refresh anyway:",
+              consentError
+            );
+            // Continue with refresh even if consent check fails
+          }
+        } else {
+          console.log(
+            "Token doesn't have provider-consents:read scope, skipping consent check"
+          );
+        }
+
         // Debug: Log token info before refresh
         console.log("Debug - Token info:", {
           credentialsId: bankAcc.credentialsId,

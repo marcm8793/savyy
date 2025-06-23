@@ -30,7 +30,7 @@ export class TransactionStorageService {
 
       try {
         await db.transaction(async (tx) => {
-          // Prepare batch data for bulk upsert
+          // Prepare batch data for bulk upsert with enhanced status tracking
           const batchData = batch.map((tinkTx) => ({
             userId,
             tinkTransactionId: tinkTx.id,
@@ -42,6 +42,8 @@ export class TransactionStorageService {
             bookedDate: tinkTx.dates.booked,
             valueDate: tinkTx.dates.value || tinkTx.dates.booked,
             status: tinkTx.status,
+            originalStatus: tinkTx.status, // Store original status for new transactions
+            statusLastUpdated: new Date(), // Always update status timestamp
             displayDescription: (tinkTx.descriptions.display ?? "").substring(
               0,
               500
@@ -71,7 +73,7 @@ export class TransactionStorageService {
             updatedAt: new Date(),
           }));
 
-          // Bulk upsert using ON CONFLICT - single query for entire batch
+          // Bulk upsert using ON CONFLICT with enhanced status change detection
           const result = await tx
             .insert(transaction)
             .values(batchData)
@@ -79,6 +81,12 @@ export class TransactionStorageService {
               target: transaction.tinkTransactionId,
               set: {
                 status: sql`EXCLUDED.status`,
+                // Only update statusLastUpdated if status actually changed
+                statusLastUpdated: sql`CASE
+                  WHEN transactions.status != EXCLUDED.status
+                  THEN EXCLUDED.status_last_updated
+                  ELSE transactions.status_last_updated
+                END`,
                 amount: sql`EXCLUDED.amount`,
                 amountScale: sql`EXCLUDED.amount_scale`,
                 displayDescription: sql`EXCLUDED.display_description`,
@@ -132,6 +140,65 @@ export class TransactionStorageService {
         updatedAt: new Date(),
       })
       .where(eq(bankAccount.id, bankAccountId));
+  }
+
+  /**
+   * Update bank account's incremental sync timestamp for consent refresh tracking
+   */
+  async updateAccountIncrementalSync(
+    db: NodePgDatabase<typeof schema>,
+    bankAccountId: string,
+    syncType: "full" | "incremental" = "incremental"
+  ): Promise<void> {
+    const now = new Date();
+
+    if (syncType === "full") {
+      await db
+        .update(bankAccount)
+        .set({
+          lastRefreshed: now,
+          lastIncrementalSync: now,
+          updatedAt: now,
+        })
+        .where(eq(bankAccount.id, bankAccountId));
+    } else {
+      await db
+        .update(bankAccount)
+        .set({
+          lastIncrementalSync: now,
+          updatedAt: now,
+        })
+        .where(eq(bankAccount.id, bankAccountId));
+    }
+  }
+
+  /**
+   * Update account consent status for tracking consent health
+   */
+  async updateAccountConsentStatus(
+    db: NodePgDatabase<typeof schema>,
+    bankAccountId: string,
+    status: string,
+    expiresAt?: Date
+  ): Promise<void> {
+    if (expiresAt) {
+      await db
+        .update(bankAccount)
+        .set({
+          consentStatus: status,
+          consentExpiresAt: expiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(bankAccount.id, bankAccountId));
+    } else {
+      await db
+        .update(bankAccount)
+        .set({
+          consentStatus: status,
+          updatedAt: new Date(),
+        })
+        .where(eq(bankAccount.id, bankAccountId));
+    }
   }
 
   /**

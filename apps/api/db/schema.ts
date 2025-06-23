@@ -93,16 +93,22 @@ export const bankAccount = pgTable("bank_accounts", {
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   // From Tink API /data/v2/accounts
-  tinkAccountId: varchar("tink_account_id", { length: 255 }).notNull().unique(), // id from API
+  tinkAccountId: varchar("tink_account_id", { length: 255 }).notNull().unique(), // id from API - unique constraint needed for foreign key reference
   accountName: varchar("account_name", { length: 255 }).notNull(), // name from API
   accountType: varchar("account_type", { length: 100 }), // type from API (CHECKING, SAVINGS, etc.)
-  financialInstitutionId: varchar("financial_institution_id", { length: 255 }), // financialInstitutionId from API
+  financialInstitutionId: varchar("financial_institution_id", {
+    length: 255,
+  }), // financialInstitutionId from API
   // Credentials information (from Tink callback URL)
-  credentialsId: varchar("credentials_id", { length: 255 }), // credentials_id from callback URL - needed for refresh operations
+  credentialsId: varchar("credentials_id", { length: 255 }), // credentials_id from callback URL - needed for refresh operations (can be null initially)
   balance: numeric("balance"), // Store balance in cents (from balances.booked.amount)
   currency: varchar("currency", { length: 3 }).default("EUR"), // from balances.booked.amount.currencyCode
-  iban: varchar("iban", { length: 34 }), // from identifiers.iban.iban
+  iban: varchar("iban", { length: 34 }), // from identifiers.iban.iban (can be null for some account types)
   lastRefreshed: timestamp("last_refreshed"), // from dates.lastRefreshed
+  // Enhanced fields for consent refresh tracking
+  lastIncrementalSync: timestamp("last_incremental_sync"), // Track last incremental sync for efficient updates
+  consentStatus: varchar("consent_status", { length: 50 }).default("ACTIVE"), // Track consent health
+  consentExpiresAt: timestamp("consent_expires_at"), // Track when consent expires
   // OAuth token info (from /api/v1/oauth/token)
   accessToken: text("access_token"), // access_token from OAuth response
   tokenExpiresAt: timestamp("token_expires_at"), // calculated from expires_in
@@ -125,7 +131,9 @@ export const transaction = pgTable("transactions", {
     .references(() => user.id, { onDelete: "cascade" }),
 
   // Core Tink API fields
-  tinkTransactionId: varchar("tink_transaction_id", { length: 255 })
+  tinkTransactionId: varchar("tink_transaction_id", {
+    length: 255,
+  })
     .notNull()
     .unique(), // id from Tink API
   tinkAccountId: varchar("tink_account_id", { length: 255 })
@@ -139,31 +147,13 @@ export const transaction = pgTable("transactions", {
   currencyCode: varchar("currency_code", { length: 3 }).notNull(), // currencyCode from amount
 
   // Dates
-  bookedDate: varchar("booked_date", { length: 10 }), // dates.booked (YYYY-MM-DD)
+  bookedDate: varchar("booked_date", { length: 10 }).notNull(), // dates.booked (YYYY-MM-DD) - every transaction should have a booked date
   transactionDate: varchar("transaction_date", { length: 10 }), // dates.transaction (YYYY-MM-DD)
   valueDate: varchar("value_date", { length: 10 }), // dates.value (YYYY-MM-DD)
   bookedDateTime: timestamp("booked_date_time"), // bookedDateTime (ISO-8601)
   transactionDateTime: timestamp("transaction_date_time"), // transactionDateTime (ISO-8601)
   valueDateTime: timestamp("value_date_time"), // valueDateTime (ISO-8601)
 
-  // TODO: Use proper date/timestamptz column types instead of varchar
-  //   Use proper date/timestamptz column types instead of varchar
-  // Storing ISO strings in text columns prevents you from leveraging PostgreSQL's rich date-arithmetic and indexing.
-
-  // +import { date, timestamptz } from "drizzle-orm/pg-core";
-  // …
-  // -  bookedDate: varchar("booked_date", { length: 10 }), // dates.booked
-  // -  transactionDate: varchar("transaction_date", { length: 10 }), // dates.transaction
-  // -  valueDate: varchar("value_date", { length: 10 }), // dates.value
-  // -  bookedDateTime: timestamp("booked_date_time"),     // without timezone
-  // -  transactionDateTime: timestamp("transaction_date_time"),
-  // -  valueDateTime: timestamp("value_date_time"),
-  // +  bookedDate: date("booked_date"),
-  // +  transactionDate: date("transaction_date"),
-  // +  valueDate: date("value_date"),
-  // +  bookedDateTime: timestamptz("booked_date_time"),
-  // +  transactionDateTime: timestamptz("transaction_date_time"),
-  // +  valueDateTime: timestamptz("value_date_time"),
   // Descriptions
   displayDescription: varchar("display_description", { length: 500 }), // descriptions.display
   originalDescription: varchar("original_description", { length: 500 }), // descriptions.original
@@ -192,6 +182,12 @@ export const transaction = pgTable("transactions", {
 
   // Mutability
   providerMutability: varchar("provider_mutability", { length: 50 }), // providerMutability
+
+  // Enhanced fields for status tracking
+  statusLastUpdated: timestamp("status_last_updated").$defaultFn(
+    () => new Date()
+  ), // Track when status last changed
+  originalStatus: varchar("original_status", { length: 20 }), // Track original status for audit
 
   // Internal tracking
   bankAccountId: text("bank_account_id")

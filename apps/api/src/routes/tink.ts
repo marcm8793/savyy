@@ -1,5 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { eq, and } from "drizzle-orm";
+import { bankAccount } from "../../db/schema";
 import { tinkService } from "../services/tinkService";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { AccountsAndBalancesService } from "../services/accountsAndBalancesService.js";
@@ -26,7 +28,8 @@ const callbackQuerySchema = z.object({
   code: z.string().optional(),
   state: z.string().optional(),
   error: z.string().optional(),
-  credentialsId: z.string().optional(), // Alternative format that Tink sometimes uses
+  credentialsId: z.string().optional(), // camelCase format
+  credentials_id: z.string().optional(), // snake_case format that Tink sometimes uses
 });
 
 const tinkRoutes: FastifyPluginAsync = async (fastify) => {
@@ -45,9 +48,11 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.redirect(`${clientUrl}/accounts?error=invalid_parameters`);
       }
 
-      const { code, state, error, credentialsId } = queryResult.data;
+      const { code, state, error, credentialsId, credentials_id } =
+        queryResult.data;
 
       // Use whichever credentials ID format Tink provided
+      const actualCredentialsId = credentialsId || credentials_id;
 
       if (error) {
         fastify.log.error({ error }, "Tink OAuth error");
@@ -117,7 +122,39 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
             // Exchange authorization code for user access token
             const tokenResponse = await tinkService.getUserAccessToken(code);
 
-            // Use AccountsAndBalancesService to sync accounts
+            // For now, we'll let the AccountsAndBalancesService handle consent refresh detection
+            // This avoids import issues and centralizes the logic
+            fastify.log.info("Processing connection", {
+              userId: stateData.userId,
+              credentialsId: actualCredentialsId,
+              hasCredentialsId: !!actualCredentialsId,
+            });
+
+            // Determine if this is a consent refresh by checking if user already has accounts with this credentialsId
+            // Only consider it a consent refresh if the user already has existing accounts with the same credentialsId
+            let isConsentRefresh = false;
+            if (actualCredentialsId) {
+              const existingAccounts = await fastify.db
+                .select()
+                .from(bankAccount)
+                .where(
+                  and(
+                    eq(bankAccount.userId, String(stateData.userId)),
+                    eq(bankAccount.credentialsId, actualCredentialsId)
+                  )
+                )
+                .limit(1);
+
+              isConsentRefresh = existingAccounts.length > 0;
+
+              fastify.log.info("Consent refresh detection:", {
+                credentialsId: actualCredentialsId,
+                existingAccountsFound: existingAccounts.length,
+                isConsentRefresh,
+              });
+            }
+
+            // Use AccountsAndBalancesService with enhanced duplicate detection
             const accountsService = new AccountsAndBalancesService();
             const syncResult = await accountsService.syncAccountsAndBalances(
               fastify.db,
@@ -125,7 +162,12 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
               tokenResponse.access_token,
               tokenResponse.scope,
               tokenResponse.expires_in,
-              credentialsId as string
+              actualCredentialsId as string,
+              {
+                isConsentRefresh,
+                previousCredentialsId: actualCredentialsId as string,
+                skipDuplicateCheck: false,
+              }
             );
 
             fastify.log.info("Accounts synced successfully", {
@@ -165,6 +207,8 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
                             dateRangeMonths: 12, // Fetch last 12 months
                             includeAllStatuses: true, // Include PENDING and UNDEFINED
                             skipCredentialsRefresh: true, // Skip refresh to avoid scope issues
+                            isConsentRefresh,
+                            lastSyncDate: account.lastRefreshed || undefined,
                           }
                         );
                       transactionSyncResults.push(transactionSyncResult);

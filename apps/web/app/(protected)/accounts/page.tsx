@@ -60,11 +60,33 @@ export default function AccountsPage() {
     offset: 0,
   });
 
+  const { data: providerConsents } = trpc.providerConsent.list.useQuery(
+    {},
+    {
+      enabled:
+        !!accounts?.length &&
+        connectionStatus !== "error" &&
+        accounts?.some(
+          (account) =>
+            account.accessToken &&
+            account.tokenExpiresAt &&
+            new Date(account.tokenExpiresAt) > new Date()
+        ),
+      retry: false, // Don't retry failed consent checks automatically
+    }
+  );
+
   const { mutateAsync: connectBankAccount } =
     trpc.account.connectBankAccount.useMutation();
 
+  const { mutateAsync: reconnectBankAccount } =
+    trpc.account.reconnectBankAccount.useMutation();
+
   const { mutateAsync: refreshCredentials } =
     trpc.transaction.refreshCredentials.useMutation();
+
+  const { mutateAsync: getUpdateConsentUrl } =
+    trpc.providerConsent.getUpdateConsentUrl.useMutation();
 
   // Check for connection status from URL params
   useEffect(() => {
@@ -167,6 +189,62 @@ export default function AccountsPage() {
     await Promise.allSettled(refreshPromises);
   };
 
+  const handleUpdateConsent = async (credentialsId: string) => {
+    try {
+      const result = await getUpdateConsentUrl({
+        credentialsId,
+        market: "FR",
+        locale: "en_US",
+      });
+
+      // Validate URL before redirect for security
+      const url = new URL(result.url);
+      if (
+        url.hostname !== "link.tink.com" &&
+        !url.hostname.endsWith(".link.tink.com")
+      ) {
+        throw new Error("Invalid Tink URL domain");
+      }
+
+      // Redirect to Tink's consent update flow
+      window.location.href = result.url;
+    } catch (error) {
+      console.error("Failed to get consent update URL:", error);
+      setConnectionStatus("error");
+    }
+  };
+
+  const getConsentStatus = (credentialsId: string) => {
+    if (!providerConsents?.consents) return null;
+
+    return providerConsents.consents.find(
+      (consent) => consent.credentialsId === credentialsId
+    );
+  };
+
+  const getConsentStatusBadge = (credentialsId: string) => {
+    // Check if we need reconnection first
+    if (providerConsents?.needsReconnection) {
+      return <Badge variant="destructive">Reconnection Required</Badge>;
+    }
+
+    const consent = getConsentStatus(credentialsId);
+
+    if (!consent) {
+      return <Badge variant="secondary">Unknown</Badge>;
+    }
+
+    if (consent.needsUpdate) {
+      return <Badge variant="destructive">Needs Update</Badge>;
+    }
+
+    if (consent.status === "UPDATED") {
+      return <Badge variant="default">Active</Badge>;
+    }
+
+    return <Badge variant="secondary">{consent.status}</Badge>;
+  };
+
   if (error) {
     return (
       <div className="container mx-auto py-8 text-center text-red-600">
@@ -199,10 +277,39 @@ export default function AccountsPage() {
         throw new Error("Invalid Tink URL domain");
       }
 
-      // Redirect to Tink with the secure URL
+      // Redirect to Tink's connection flow
       window.location.href = result.url;
     } catch (error) {
-      console.error("Failed to connect to Tink:", error);
+      console.error("Failed to connect bank account:", error);
+      setConnectionStatus("error");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleReconnectAccount = async () => {
+    try {
+      setIsConnecting(true);
+
+      // Call the specific reconnect procedure for expired sessions
+      const result = await reconnectBankAccount({
+        market: "FR",
+        locale: "en_US",
+      });
+
+      // Validate URL before redirect for security
+      const url = new URL(result.url);
+      if (
+        url.hostname !== "link.tink.com" &&
+        !url.hostname.endsWith(".link.tink.com")
+      ) {
+        throw new Error("Invalid Tink URL domain");
+      }
+
+      // Redirect to Tink's reconnection flow
+      window.location.href = result.url;
+    } catch (error) {
+      console.error("Failed to reconnect bank account:", error);
       setConnectionStatus("error");
     } finally {
       setIsConnecting(false);
@@ -329,6 +436,19 @@ export default function AccountsPage() {
             </Alert>
           )}
 
+          {/* Reconnection Needed Alert */}
+          {providerConsents?.needsReconnection && (
+            <Alert className="mb-6 border-orange-200 bg-orange-50">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800">
+                <strong>Bank reconnection required:</strong>{" "}
+                {"message" in providerConsents
+                  ? providerConsents.message
+                  : "Your bank session has expired. Please reconnect your accounts to continue accessing your financial data."}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Accounts Grid */}
           {accounts && accounts.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -388,33 +508,89 @@ export default function AccountsPage() {
                           </span>
                         </div>
 
-                        {/* Refresh Button */}
+                        {/* Consent Status */}
                         {account.credentialsId && (
-                          <div className="pt-2 border-t">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleRefreshAccount(
-                                  account.credentialsId!,
-                                  account.id
-                                )
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground">
+                              Connection Status:
+                            </span>
+                            {getConsentStatusBadge(account.credentialsId)}
+                          </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        {account.credentialsId && (
+                          <div className="pt-2 border-t space-y-2">
+                            {/* Show different buttons based on consent status */}
+                            {(() => {
+                              // If we need reconnection, show reconnect button
+                              if (providerConsents?.needsReconnection) {
+                                return (
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={handleReconnectAccount}
+                                    disabled={isConnecting}
+                                    className="w-full"
+                                  >
+                                    {isConnecting ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Connecting...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <AlertCircle className="mr-2 h-4 w-4" />
+                                        Reconnect Account
+                                      </>
+                                    )}
+                                  </Button>
+                                );
                               }
-                              disabled={isRefreshing}
-                              className="w-full"
-                            >
-                              {isRefreshing ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Refreshing...
-                                </>
+
+                              // Check individual consent status
+                              const consent = getConsentStatus(
+                                account.credentialsId!
+                              );
+                              return consent?.needsUpdate ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateConsent(account.credentialsId!)
+                                  }
+                                  className="w-full"
+                                >
+                                  <AlertCircle className="mr-2 h-4 w-4" />
+                                  Update Connection
+                                </Button>
                               ) : (
-                                <>
-                                  <RefreshCw className="mr-2 h-4 w-4" />
-                                  Refresh Data
-                                </>
-                              )}
-                            </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleRefreshAccount(
+                                      account.credentialsId!,
+                                      account.id
+                                    )
+                                  }
+                                  disabled={isRefreshing}
+                                  className="w-full"
+                                >
+                                  {isRefreshing ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Refreshing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RefreshCw className="mr-2 h-4 w-4" />
+                                      Refresh Data
+                                    </>
+                                  )}
+                                </Button>
+                              );
+                            })()}
                           </div>
                         )}
 

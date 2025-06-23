@@ -26,6 +26,28 @@ interface TinkUserAuthorizationCodeResponse {
   code: string;
 }
 
+// Provider consent types based on Tink API documentation
+export interface TinkProviderConsent {
+  accountIds: string[];
+  credentialsId: string;
+  detailedError?: {
+    details: {
+      reason: string;
+      retryable: boolean;
+    };
+    displayMessage: string;
+    type: string;
+  };
+  providerName: string;
+  sessionExpiryDate: number;
+  status: string;
+  statusUpdated: number;
+}
+
+export interface TinkProviderConsentsResponse {
+  providerConsents: TinkProviderConsent[];
+}
+
 export class TinkService {
   private readonly clientId: string;
   private readonly clientSecret: string;
@@ -547,6 +569,163 @@ export class TinkService {
     const userToken = await this.getUserAccessToken(authCode.code);
 
     return userToken;
+  }
+
+  //____________________________________________________________________________________
+  //____________________________________________________________________________________
+  // NOTE:
+  // Provider Consent Management
+  //____________________________________________________________________________________
+  //____________________________________________________________________________________
+
+  /**
+   * List provider consents for a user
+   * Requires user access token with provider-consents:read scope
+   */
+  async listProviderConsents(
+    userAccessToken: string
+  ): Promise<TinkProviderConsentsResponse> {
+    const response = await fetch(`${this.baseUrl}/api/v1/provider-consents`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${userAccessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("Tink provider consents response:", {
+      status: response.status,
+      statusText: response.statusText,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Failed to list provider consents:", errorText);
+      throw new Error(
+        `Failed to list provider consents: ${response.status} ${errorText}`
+      );
+    }
+
+    const data: TinkProviderConsentsResponse =
+      (await response.json()) as TinkProviderConsentsResponse;
+
+    console.log("Provider consents fetched:", {
+      consentCount: data.providerConsents?.length || 0,
+      consents:
+        data.providerConsents?.map((consent) => ({
+          credentialsId: consent.credentialsId,
+          providerName: consent.providerName,
+          status: consent.status,
+          accountCount: consent.accountIds?.length || 0,
+          hasError: !!consent.detailedError,
+          sessionExpiryDate: new Date(consent.sessionExpiryDate).toISOString(),
+        })) || [],
+    });
+
+    return data;
+  }
+
+  /**
+   * Build Tink URL for updating consent
+   * Used when a consent needs to be refreshed due to expiration or errors
+   */
+  buildUpdateConsentUrl(
+    authorizationCode: string,
+    credentialsId: string,
+    options: {
+      market?: string;
+      locale?: string;
+      state?: string;
+      redirectUri?: string;
+    } = {}
+  ): string {
+    const { market = "FR", state, redirectUri = this.redirectUri } = options;
+
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      redirect_uri: redirectUri,
+      credentials_id: credentialsId,
+      authorization_code: authorizationCode,
+      market,
+    });
+
+    if (state) {
+      params.append("state", state);
+    }
+
+    return `https://link.tink.com/1.0/transactions/update-consent?${params.toString()}`;
+  }
+
+  /**
+   * Build Tink URL for extending consent
+   * Used to extend the validity of an existing consent session
+   */
+  buildExtendConsentUrl(
+    authorizationCode: string,
+    credentialsId: string,
+    options: {
+      market?: string;
+      locale?: string;
+      state?: string;
+      redirectUri?: string;
+    } = {}
+  ): string {
+    const { market = "FR", state, redirectUri = this.redirectUri } = options;
+
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      redirect_uri: redirectUri,
+      credentials_id: credentialsId,
+      authorization_code: authorizationCode,
+      market,
+    });
+
+    if (state) {
+      params.append("state", state);
+    }
+
+    return `https://link.tink.com/1.0/transactions/extend-consent?${params.toString()}`;
+  }
+
+  /**
+   * Check if a consent needs updating based on status and expiry
+   */
+  isConsentUpdateNeeded(consent: TinkProviderConsent): boolean {
+    // Check if consent has expired
+    const now = Date.now();
+    if (consent.sessionExpiryDate && consent.sessionExpiryDate < now) {
+      return true;
+    }
+
+    // Check if consent has errors that are retryable
+    if (consent.detailedError?.details?.retryable) {
+      return true;
+    }
+
+    // Check status - these typically need updates
+    const statusesNeedingUpdate = [
+      "TEMPORARY_ERROR",
+      "AUTHENTICATION_ERROR",
+      "SESSION_EXPIRED",
+    ];
+
+    return statusesNeedingUpdate.includes(consent.status);
+  }
+
+  /**
+   * Get consent by credentials ID
+   */
+  async getConsentByCredentialsId(
+    userAccessToken: string,
+    credentialsId: string
+  ): Promise<TinkProviderConsent | null> {
+    const consentsResponse = await this.listProviderConsents(userAccessToken);
+
+    const consent = consentsResponse.providerConsents.find(
+      (c) => c.credentialsId === credentialsId
+    );
+
+    return consent || null;
   }
 }
 

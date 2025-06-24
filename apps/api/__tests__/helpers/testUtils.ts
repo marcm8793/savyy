@@ -2,6 +2,45 @@ import { FastifyInstance } from "fastify";
 import { createApp } from "../../src/app.js";
 
 /**
+ * Type definitions for test context
+ */
+export interface MockUser {
+  id: string;
+  email: string;
+  name: string;
+  role?: string;
+}
+
+export interface MockRequest {
+  headers?: Record<string, string | string[]>;
+  body?: unknown;
+  params?: Record<string, string>;
+  query?: Record<string, string | string[]>;
+  user?: MockUser | null;
+}
+
+export interface MockResponse {
+  statusCode?: number;
+  headers?: Record<string, string>;
+}
+
+export interface MockContext {
+  req: MockRequest;
+  res: MockResponse;
+  user: MockUser | null;
+  db?: unknown;
+  redis?: unknown;
+}
+
+export interface MockContextOverrides {
+  req?: Partial<MockRequest>;
+  res?: Partial<MockResponse>;
+  user?: MockUser | null;
+  db?: unknown;
+  redis?: unknown;
+}
+
+/**
  * Creates a test app instance
  */
 export async function createTestApp(): Promise<FastifyInstance> {
@@ -23,17 +62,22 @@ export async function cleanupTestApp(app: FastifyInstance): Promise<void> {
 /**
  * Helper to create mock request context for tRPC testing
  */
-export function createMockContext(overrides: Record<string, unknown> = {}) {
+export function createMockContext(
+  overrides: MockContextOverrides = {}
+): MockContext {
   return {
     req: {
       headers: {},
-      ...(overrides.req as Record<string, unknown>),
+      ...overrides.req,
     },
     res: {
-      ...(overrides.res as Record<string, unknown>),
+      statusCode: 200,
+      headers: {},
+      ...overrides.res,
     },
     user: overrides.user || null,
-    ...overrides,
+    db: overrides.db,
+    redis: overrides.redis,
   };
 }
 

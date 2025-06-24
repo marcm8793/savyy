@@ -63,15 +63,7 @@ export default function AccountsPage() {
   const { data: providerConsents } = trpc.providerConsent.list.useQuery(
     {},
     {
-      enabled:
-        !!accounts?.length &&
-        connectionStatus !== "error" &&
-        accounts?.some(
-          (account) =>
-            account.accessToken &&
-            account.tokenExpiresAt &&
-            new Date(account.tokenExpiresAt) > new Date()
-        ),
+      enabled: !!accounts?.length && connectionStatus !== "error",
       retry: false, // Don't retry failed consent checks automatically
     }
   );
@@ -228,9 +220,28 @@ export default function AccountsPage() {
       return <Badge variant="destructive">Reconnection Required</Badge>;
     }
 
+    // Check if we have an account with expired token
+    const account = accounts?.find(
+      (acc) => acc.credentialsId === credentialsId
+    );
+    if (
+      account?.tokenExpiresAt &&
+      new Date(account.tokenExpiresAt) <= new Date()
+    ) {
+      return <Badge variant="destructive">Session Expired</Badge>;
+    }
+
     const consent = getConsentStatus(credentialsId);
 
     if (!consent) {
+      // If we don't have consent data but have a valid token, show checking status
+      if (
+        account?.accessToken &&
+        account?.tokenExpiresAt &&
+        new Date(account.tokenExpiresAt) > new Date()
+      ) {
+        return <Badge variant="outline">Checking...</Badge>;
+      }
       return <Badge variant="secondary">Unknown</Badge>;
     }
 

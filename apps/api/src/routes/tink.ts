@@ -119,8 +119,14 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
           }
 
           try {
-            // Exchange authorization code for user access token
-            const tokenResponse = await tinkService.getUserAccessToken(code);
+            // Generate user access token with data access scopes
+            // The code from the callback only has authorization scopes, so we need to generate
+            // a new authorization code with data access scopes and exchange it for a user token
+            const tokenResponse = await tinkService.getUserAccessTokenFlow({
+              tinkUserId: stateData.userId,
+              scope:
+                "accounts:read,balances:read,transactions:read,provider-consents:read",
+            });
 
             // For now, we'll let the AccountsAndBalancesService handle consent refresh detection
             // This avoids import issues and centralizes the logic

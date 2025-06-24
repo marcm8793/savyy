@@ -292,7 +292,8 @@ export class TinkService {
       throw new Error("idHint must be provided");
     }
 
-    // Default scope as per Tink documentation
+    // Default scope as per Tink documentation Section 2.2 - Grant user access
+    // This should NOT include data access scopes (accounts:read, etc.)
     const defaultScope =
       "authorization:read,authorization:grant,credentials:refresh,credentials:read,credentials:write,providers:read,user:read";
 

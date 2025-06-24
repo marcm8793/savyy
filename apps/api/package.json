@@ -11,6 +11,11 @@
     "lint:check": "eslint src --ext .ts --max-warnings 0",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
     "db:generate": "drizzle-kit generate:pg",
     "db:push": "npx drizzle-kit push --config=./db/drizzle.config.ts",
     "db:studio": "npx drizzle-kit studio --config=./db/drizzle.config.ts",
@@ -44,10 +49,15 @@
     "@types/pg": "^8.15.4",
     "@typescript-eslint/eslint-plugin": "^8.33.1",
     "@typescript-eslint/parser": "^8.33.1",
+    "@vitest/coverage-v8": "^2.1.8",
+    "@vitest/ui": "^2.1.8",
     "drizzle-kit": "^0.31.1",
     "eslint": "^9.28.0",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.2",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.33.1"
+    "typescript-eslint": "^8.33.1",
+    "vitest": "^2.1.8"
   }
 }

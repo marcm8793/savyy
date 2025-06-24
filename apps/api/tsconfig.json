@@ -11,6 +11,13 @@
     "rootDirs": ["src", "db", "drizzle"],
     "moduleResolution": "NodeNext"
   },
-  "include": ["src/**/*", "drizzle/**/*", "db/**/*", "scripts/**/*"],
+  "include": [
+    "src/**/*",
+    "drizzle/**/*",
+    "db/**/*",
+    "scripts/**/*",
+    "__tests__/**/*",
+    "vitest.config.mts"
+  ],
   "exclude": ["node_modules"]
 }

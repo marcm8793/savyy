@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,15 @@ export default function AccountsPage() {
     Record<string, { success: boolean; message: string }>
   >({});
 
+  const timeoutIds = useRef<NodeJS.Timeout[]>([]);
+
+  useEffect(() => {
+    return () => {
+      timeoutIds.current.forEach(clearTimeout);
+      timeoutIds.current = [];
+    };
+  }, []);
+
   // tRPC queries and mutations
   const {
     data: accounts,
@@ -89,14 +98,17 @@ export default function AccountsPage() {
     if (connected === "true") {
       setConnectionStatus("success");
       // Add a small delay to ensure backend has processed the token update
-      setTimeout(() => {
+      const refetchTimeout = setTimeout(() => {
         refetch(); // Refetch accounts data
         refetchConsents(); // Refetch consent data to get updated status
       }, 1000);
+      timeoutIds.current.push(refetchTimeout);
+
       // Clear the success status after 5 seconds to show actual status
-      setTimeout(() => {
+      const clearStatusTimeout = setTimeout(() => {
         setConnectionStatus(null);
       }, 5000);
+      timeoutIds.current.push(clearStatusTimeout);
     } else if (error) {
       setConnectionStatus("error");
     }
@@ -148,9 +160,10 @@ export default function AccountsPage() {
       }));
 
       // Refetch accounts after a short delay to show updated data
-      setTimeout(() => {
+      const refetchDelayTimeout = setTimeout(() => {
         refetch();
       }, 2000);
+      timeoutIds.current.push(refetchDelayTimeout);
     } catch (error) {
       console.error("Failed to refresh account:", error);
       const errorMessage =

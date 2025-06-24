@@ -470,9 +470,10 @@ export class AccountsAndBalancesService {
               existingAccountId: duplicateCheck.existingAccount.id,
             });
 
-            // For consent refresh, update the existing account instead of creating duplicate
+            // For consent refresh or token refresh, update the existing account instead of creating duplicate
             if (
               syncMode.mode === "consent_refresh" ||
+              syncMode.mode === "token_refresh" ||
               duplicateCheck.duplicateReason === "same_tink_account"
             ) {
               const updatedAccount = await this.updateExistingAccount(

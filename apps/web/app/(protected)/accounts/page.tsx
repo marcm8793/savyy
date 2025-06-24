@@ -60,13 +60,14 @@ export default function AccountsPage() {
     offset: 0,
   });
 
-  const { data: providerConsents } = trpc.providerConsent.list.useQuery(
-    {},
-    {
-      enabled: !!accounts?.length && connectionStatus !== "error",
-      retry: false, // Don't retry failed consent checks automatically
-    }
-  );
+  const { data: providerConsents, refetch: refetchConsents } =
+    trpc.providerConsent.list.useQuery(
+      {},
+      {
+        enabled: !!accounts?.length && connectionStatus !== "error",
+        retry: false, // Don't retry failed consent checks automatically
+      }
+    );
 
   const { mutateAsync: connectBankAccount } =
     trpc.account.connectBankAccount.useMutation();
@@ -87,11 +88,19 @@ export default function AccountsPage() {
 
     if (connected === "true") {
       setConnectionStatus("success");
-      refetch();
+      // Add a small delay to ensure backend has processed the token update
+      setTimeout(() => {
+        refetch(); // Refetch accounts data
+        refetchConsents(); // Refetch consent data to get updated status
+      }, 1000);
+      // Clear the success status after 5 seconds to show actual status
+      setTimeout(() => {
+        setConnectionStatus(null);
+      }, 5000);
     } else if (error) {
       setConnectionStatus("error");
     }
-  }, [searchParams, refetch]);
+  }, [searchParams, refetch, refetchConsents]);
 
   const handleRefreshAccount = async (
     credentialsId: string,
@@ -218,6 +227,11 @@ export default function AccountsPage() {
     // Check if we need reconnection first
     if (providerConsents?.needsReconnection) {
       return <Badge variant="destructive">Reconnection Required</Badge>;
+    }
+
+    // If we just connected successfully, show positive status briefly
+    if (connectionStatus === "success") {
+      return <Badge variant="default">Recently Connected</Badge>;
     }
 
     // Check if we have an account with expired token

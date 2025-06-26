@@ -27,7 +27,7 @@ export default function HeroSection() {
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl">
             Take complete control of your financial future with Savyy. Track all
             your assets, get personalized insights, and make smarter investment
-            decisions with our intelligent platform. test
+            decisions with our intelligent platform.
           </p>
 
           {/* CTA Buttons */}

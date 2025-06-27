@@ -61,43 +61,21 @@ export default function CategoriesPage() {
     dateRange,
   });
 
-  // Fetch recent transactions that need review
-  const { data: reviewTransactions } = trpc.transaction.list.useQuery({
-    bookedDateGte: dateRange.from,
-    bookedDateLte: dateRange.to,
-    pageSize: 50,
+  // Fetch transactions that need review
+  const { data: reviewTransactions } = trpc.transaction.needsReview.useQuery({
+    dateRange,
+    limit: 20,
   });
 
-  // Filter transactions that need review
-  const transactionsNeedingReview = useMemo(() => {
-    if (!reviewTransactions?.transactions) return [];
-    return reviewTransactions.transactions.filter(
-      (t) => t.needsReview || (!t.mainCategory && !t.categoryName)
-    );
-  }, [reviewTransactions]);
-
-  // Calculate categorization metrics
+  // Get categorization metrics from stats endpoint
   const categorizationMetrics = useMemo(() => {
-    if (!reviewTransactions?.transactions) return null;
+    return stats?.categorizationMetrics || null;
+  }, [stats]);
 
-    const total = reviewTransactions.transactions.length;
-    const categorized = reviewTransactions.transactions.filter(
-      (t) => t.mainCategory || t.categoryName
-    ).length;
-    const needsReview = transactionsNeedingReview.length;
-    const automated = reviewTransactions.transactions.filter(
-      (t) => t.mainCategory && t.categorySource !== "user"
-    ).length;
-
-    return {
-      total,
-      categorized,
-      needsReview,
-      automated,
-      accuracy: total > 0 ? Math.round((categorized / total) * 100) : 0,
-      automation: total > 0 ? Math.round((automated / total) * 100) : 0,
-    };
-  }, [reviewTransactions, transactionsNeedingReview]);
+  // Use transactions from needsReview endpoint
+  const transactionsNeedingReview = useMemo(() => {
+    return reviewTransactions?.transactions || [];
+  }, [reviewTransactions]);
 
   // Convert category breakdown to array for display
   const categoryData = useMemo(() => {
@@ -123,9 +101,10 @@ export default function CategoriesPage() {
     }).format(Math.abs(amount));
   };
 
-  const getConfidenceColor = (confidence: string | null) => {
+  const getConfidenceColor = (confidence: string | number | null) => {
     if (!confidence) return "text-gray-500";
-    const conf = parseFloat(confidence);
+    const conf =
+      typeof confidence === "string" ? parseFloat(confidence) : confidence;
     if (conf >= 0.9) return "text-green-600";
     if (conf >= 0.7) return "text-yellow-600";
     return "text-red-600";
@@ -348,105 +327,106 @@ export default function CategoriesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {transactionsNeedingReview
-                        .slice(0, 10)
-                        .map((transaction) => {
-                          const amount = parseFloat(transaction.amount);
-                          const scaledAmount =
-                            amount / Math.pow(10, transaction.amountScale || 0);
+                      {transactionsNeedingReview.map((transaction) => {
+                        const amount = parseFloat(transaction.amount);
+                        const scaledAmount =
+                          amount / Math.pow(10, transaction.amountScale || 0);
 
-                          return (
-                            <TableRow key={transaction.id}>
-                              <TableCell>
-                                <div className="font-medium">
-                                  {transaction.displayDescription ||
-                                    transaction.originalDescription ||
-                                    "No description"}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {transaction.merchantName ||
-                                    transaction.payeeName ||
-                                    transaction.payerName}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {transaction.mainCategory &&
-                                transaction.subCategory ? (
-                                  <div className="flex flex-col gap-1">
-                                    <Badge
-                                      variant="default"
-                                      className="text-xs"
-                                    >
-                                      {transaction.mainCategory}
-                                    </Badge>
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-xs"
-                                    >
-                                      {transaction.subCategory}
-                                    </Badge>
-                                  </div>
-                                ) : transaction.categoryName ? (
-                                  <Badge variant="secondary">
-                                    {transaction.categoryName}
+                        return (
+                          <TableRow key={transaction.id}>
+                            <TableCell>
+                              <div className="font-medium">
+                                {transaction.displayDescription ||
+                                  transaction.originalDescription ||
+                                  "No description"}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {transaction.merchantName ||
+                                  transaction.payeeName ||
+                                  transaction.payerName}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {transaction.mainCategory &&
+                              transaction.subCategory ? (
+                                <div className="flex flex-col gap-1">
+                                  <Badge variant="default" className="text-xs">
+                                    {transaction.mainCategory}
                                   </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground text-sm">
-                                    Uncategorized
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {transaction.categorySource && (
                                   <Badge
-                                    variant={getSourceBadgeVariant(
-                                      transaction.categorySource
-                                    )}
+                                    variant="secondary"
+                                    className="text-xs"
                                   >
-                                    {transaction.categorySource}
+                                    {transaction.subCategory}
                                   </Badge>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {transaction.categoryConfidence && (
-                                  <span
-                                    className={getConfidenceColor(
-                                      transaction.categoryConfidence
-                                    )}
-                                  >
-                                    {Math.round(
-                                      parseFloat(
-                                        transaction.categoryConfidence
-                                      ) * 100
-                                    )}
-                                    %
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <span
-                                  className={
-                                    scaledAmount < 0
-                                      ? "text-red-600"
-                                      : "text-green-600"
-                                  }
-                                >
-                                  {formatAmount(scaledAmount)}
+                                </div>
+                              ) : transaction.categoryName ? (
+                                <Badge variant="secondary">
+                                  {transaction.categoryName}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">
+                                  Uncategorized
                                 </span>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {transaction.categorySource && (
+                                <Badge
+                                  variant={getSourceBadgeVariant(
+                                    transaction.categorySource
+                                  )}
+                                >
+                                  {transaction.categorySource}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {transaction.categoryConfidence && (
+                                <span
+                                  className={getConfidenceColor(
+                                    transaction.categoryConfidence
+                                  )}
+                                >
+                                  {Math.round(
+                                    (typeof transaction.categoryConfidence ===
+                                    "string"
+                                      ? parseFloat(
+                                          transaction.categoryConfidence
+                                        )
+                                      : transaction.categoryConfidence) * 100
+                                  )}
+                                  %
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span
+                                className={
+                                  scaledAmount < 0
+                                    ? "text-red-600"
+                                    : "text-green-600"
+                                }
+                              >
+                                {formatAmount(scaledAmount)}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
-                {transactionsNeedingReview.length > 10 && (
-                  <div className="mt-4 text-center">
-                    <Button variant="outline">
-                      View All {transactionsNeedingReview.length} Transactions
-                    </Button>
-                  </div>
-                )}
+                {categorizationMetrics &&
+                  categorizationMetrics.needsReview >
+                    transactionsNeedingReview.length && (
+                    <div className="mt-4 text-center">
+                      <Button variant="outline">
+                        View All {categorizationMetrics.needsReview}{" "}
+                        Transactions
+                      </Button>
+                    </div>
+                  )}
               </CardContent>
             </Card>
           )}

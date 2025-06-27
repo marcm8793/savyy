@@ -387,6 +387,9 @@ export const transactionRouter = router({
             let accountUpdated = 0;
             let accountErrors = 0;
 
+            // Create storage service once and reuse for all pages
+            const storageService = new TransactionStorageService();
+
             do {
               const response = await fetchTinkTransactions(
                 refreshedAccount.accessToken!,
@@ -401,7 +404,6 @@ export const transactionRouter = router({
               );
 
               // Process this page immediately with categorization
-              const storageService = new TransactionStorageService();
               const pageResult =
                 await storageService.storeTransactionsWithUpsert(
                   db,
@@ -669,6 +671,61 @@ export const transactionRouter = router({
       }
     }),
 
+  // Get transactions that need review
+  needsReview: protectedProcedure
+    .input(
+      z.object({
+        accountIds: z.array(z.string()).optional(),
+        dateRange: z
+          .object({
+            from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          })
+          .optional(),
+        limit: z.number().min(1).max(100).default(10),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        const { db, user } = ctx;
+
+        // Build where conditions
+        const conditions = [
+          eq(transaction.userId, user.id),
+          // Filter for transactions that need review
+          sql`(${transaction.needsReview} = true OR (${transaction.mainCategory} IS NULL AND ${transaction.categoryName} IS NULL))`,
+        ];
+
+        if (input.accountIds && input.accountIds.length > 0) {
+          conditions.push(inArray(transaction.tinkAccountId, input.accountIds));
+        }
+
+        if (input.dateRange) {
+          conditions.push(gte(transaction.bookedDate, input.dateRange.from));
+          conditions.push(lte(transaction.bookedDate, input.dateRange.to));
+        }
+
+        // Get transactions that need review
+        const transactions = await db
+          .select()
+          .from(transaction)
+          .where(and(...conditions))
+          .orderBy(desc(transaction.bookedDate), desc(transaction.createdAt))
+          .limit(input.limit);
+
+        return {
+          transactions,
+          count: transactions.length,
+        };
+      } catch (error) {
+        console.error("Error fetching transactions needing review:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch transactions needing review",
+        });
+      }
+    }),
+
   // Get transaction statistics using SQL aggregates for performance
   stats: protectedProcedure
     .input(
@@ -758,7 +815,59 @@ export const transactionRouter = router({
           .where(and(...conditions))
           .groupBy(sql`COALESCE(${transaction.categoryName}, 'Uncategorized')`);
 
+        // Get categorization metrics using SQL aggregates
+        const categorizationStatsResult = await db
+          .select({
+            totalCategorized: sql<number>`
+              COUNT(
+                CASE
+                  WHEN ${transaction.mainCategory} IS NOT NULL OR ${transaction.categoryName} IS NOT NULL
+                  THEN 1
+                END
+              )::int
+            `,
+            totalNeedsReview: sql<number>`
+              COUNT(
+                CASE
+                  WHEN ${transaction.needsReview} = true OR (${transaction.mainCategory} IS NULL AND ${transaction.categoryName} IS NULL)
+                  THEN 1
+                END
+              )::int
+            `,
+            totalAutomated: sql<number>`
+              COUNT(
+                CASE
+                  WHEN ${transaction.mainCategory} IS NOT NULL AND ${transaction.categorySource} != 'user'
+                  THEN 1
+                END
+              )::int
+            `,
+            totalUserCategorized: sql<number>`
+              COUNT(
+                CASE
+                  WHEN ${transaction.categorySource} = 'user'
+                  THEN 1
+                END
+              )::int
+            `,
+          })
+          .from(transaction)
+          .where(and(...conditions));
+
+        // Get categorization source breakdown
+        const sourceStatsResult = await db
+          .select({
+            source: sql<string>`COALESCE(${transaction.categorySource}, 'uncategorized')`,
+            count: sql<number>`COUNT(*)::int`,
+          })
+          .from(transaction)
+          .where(and(...conditions))
+          .groupBy(
+            sql`COALESCE(${transaction.categorySource}, 'uncategorized')`
+          );
+
         const basicStats = basicStatsResult[0];
+        const categorizationStats = categorizationStatsResult[0];
         const totalIncome = Number(basicStats.totalIncome);
         const totalExpenses = Number(basicStats.totalExpenses);
 
@@ -776,6 +885,33 @@ export const transactionRouter = router({
           return acc;
         }, {} as Record<string, { count: number; amount: number }>);
 
+        const sourceBreakdown = sourceStatsResult.reduce((acc, row) => {
+          acc[row.source] = row.count;
+          return acc;
+        }, {} as Record<string, number>);
+
+        // Calculate categorization metrics
+        const totalTransactions = basicStats.totalTransactions;
+        const categorized = categorizationStats.totalCategorized;
+        const needsReview = categorizationStats.totalNeedsReview;
+        const automated = categorizationStats.totalAutomated;
+
+        const categorizationMetrics = {
+          total: totalTransactions,
+          categorized,
+          needsReview,
+          automated,
+          userCategorized: categorizationStats.totalUserCategorized,
+          accuracy:
+            totalTransactions > 0
+              ? Math.round((categorized / totalTransactions) * 100)
+              : 0,
+          automation:
+            totalTransactions > 0
+              ? Math.round((automated / totalTransactions) * 100)
+              : 0,
+        };
+
         return {
           totalTransactions: basicStats.totalTransactions,
           totalIncome,
@@ -783,6 +919,8 @@ export const transactionRouter = router({
           netAmount: totalIncome - totalExpenses,
           categoryBreakdown,
           statusBreakdown,
+          sourceBreakdown,
+          categorizationMetrics,
         };
       } catch (error) {
         console.error("Error calculating transaction stats:", error);

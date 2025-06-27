@@ -4,8 +4,10 @@ import {
   schema,
   categoryRule,
   mccCategoryMapping,
+  categoryDefinition,
   CategoryRule,
   MccCategoryMapping,
+  CategoryDefinition,
 } from "../../../db/schema";
 import { TinkTransaction } from "./types";
 
@@ -46,8 +48,13 @@ export class TransactionCategorizationService {
   private merchantRulesCache = new Map<string, CategoryRule>();
   private mccMappingCache = new Map<string, MccCategoryMapping>();
   private userRulesCache = new Map<string, CategoryRule[]>();
+  private validCategoriesCache = new Set<string>(); // Cache for valid category combinations
   private cacheExpiry = 5 * 60 * 1000; // 5 minutes
   private lastCacheUpdate = 0;
+
+  // TODO: Consider using a more sophisticated caching mechanism (e.g., Redis) for production
+  // Add thread-safety to cache operations
+  // The caching implementation could have race conditions if multiple requests trigger cache refresh simultaneously. Consider adding mutex/lock mechanism or using a proper caching library.
 
   constructor() {
     // Initialize with empty cache
@@ -106,14 +113,15 @@ export class TransactionCategorizationService {
     }
 
     // 2. Check user-specific rules (highest priority)
-    const userRuleResult = await this.applyUserRules(userId, transaction);
+    const userRuleResult = await this.applyUserRules(db, userId, transaction);
     if (userRuleResult) {
       return userRuleResult;
     }
 
     // 3. Check MCC code mapping
     if (transaction.merchantInformation?.merchantCategoryCode) {
-      const mccResult = this.applyMccMapping(
+      const mccResult = await this.applyMccMapping(
+        db,
         transaction.merchantInformation.merchantCategoryCode
       );
       if (mccResult) {
@@ -123,7 +131,8 @@ export class TransactionCategorizationService {
 
     // 4. Check merchant name patterns
     if (transaction.merchantInformation?.merchantName) {
-      const merchantResult = this.applyMerchantRules(
+      const merchantResult = await this.applyMerchantRules(
+        db,
         transaction.merchantInformation.merchantName
       );
       if (merchantResult) {
@@ -151,9 +160,91 @@ export class TransactionCategorizationService {
   }
 
   /**
+   * Validate that a category combination exists in categoryDefinition table
+   */
+  private async validateCategories(
+    db: NodePgDatabase<typeof schema>,
+    mainCategory: string,
+    subCategory: string
+  ): Promise<boolean> {
+    const cacheKey = `${mainCategory}:${subCategory}`;
+
+    // Check cache first
+    if (this.validCategoriesCache.has(cacheKey)) {
+      return true;
+    }
+
+    // Query database to check if category exists
+    const categoryExists: CategoryDefinition[] = await db
+      .select()
+      .from(categoryDefinition)
+      .where(
+        and(
+          eq(categoryDefinition.mainCategory, mainCategory),
+          eq(categoryDefinition.subCategory, subCategory),
+          eq(categoryDefinition.isActive, true)
+        )
+      )
+      .limit(1);
+
+    const isValid = categoryExists.length > 0;
+
+    // Cache valid categories
+    if (isValid) {
+      this.validCategoriesCache.add(cacheKey);
+    }
+
+    return isValid;
+  }
+
+  /**
+   * Create a validated categorization result
+   */
+  private async createValidatedResult(
+    db: NodePgDatabase<typeof schema>,
+    mainCategory: string,
+    subCategory: string,
+    source: CategorizationResult["source"],
+    confidence: number,
+    needsReview: boolean = false,
+    ruleId?: string
+  ): Promise<CategorizationResult | null> {
+    const isValid = await this.validateCategories(
+      db,
+      mainCategory,
+      subCategory
+    );
+
+    if (!isValid) {
+      console.warn(
+        `Invalid category combination: ${mainCategory}:${subCategory} from source: ${source}`
+      );
+
+      // Return default category for invalid combinations
+      return {
+        mainCategory: "Other",
+        subCategory: "Miscellaneous",
+        source: "default",
+        confidence: 0.1,
+        needsReview: true, // Flag for manual review
+      };
+    }
+
+    return {
+      mainCategory,
+      subCategory,
+      source,
+      confidence,
+      needsReview,
+      ruleId,
+    };
+  }
+
+  /**
    * Apply user-specific rules with highest priority
    */
   private async applyUserRules(
+    db: NodePgDatabase<typeof schema>,
     userId: string,
     transaction: TinkTransaction
   ): Promise<CategorizationResult | null> {
@@ -166,14 +257,15 @@ export class TransactionCategorizationService {
 
     for (const rule of sortedRules) {
       if (this.ruleMatches(rule, transaction)) {
-        return {
-          mainCategory: rule.mainCategory,
-          subCategory: rule.subCategory,
-          source: "user",
-          confidence: Number(rule.confidence) || 0.9,
-          ruleId: rule.id,
-          needsReview: false,
-        };
+        return await this.createValidatedResult(
+          db,
+          rule.mainCategory,
+          rule.subCategory,
+          "user",
+          Number(rule.confidence) || 0.9,
+          false,
+          rule.id
+        );
       }
     }
 
@@ -183,16 +275,20 @@ export class TransactionCategorizationService {
   /**
    * Apply MCC code mapping
    */
-  private applyMccMapping(mccCode: string): CategorizationResult | null {
+  private async applyMccMapping(
+    db: NodePgDatabase<typeof schema>,
+    mccCode: string
+  ): Promise<CategorizationResult | null> {
     const mapping = this.mccMappingCache.get(mccCode);
     if (mapping && mapping.isActive) {
-      return {
-        mainCategory: mapping.mainCategory,
-        subCategory: mapping.subCategory,
-        source: "mcc",
-        confidence: Number(mapping.confidence) || 0.8,
-        needsReview: false,
-      };
+      return await this.createValidatedResult(
+        db,
+        mapping.mainCategory,
+        mapping.subCategory,
+        "mcc",
+        Number(mapping.confidence) || 0.8,
+        false
+      );
     }
     return null;
   }
@@ -200,12 +296,13 @@ export class TransactionCategorizationService {
   /**
    * Apply merchant name pattern matching
    */
-  private applyMerchantRules(
+  private async applyMerchantRules(
+    db: NodePgDatabase<typeof schema>,
     merchantName: string
-  ): CategorizationResult | null {
+  ): Promise<CategorizationResult | null> {
     const normalizedMerchant = merchantName.toLowerCase().trim();
 
-    // Common merchant patterns (these could be moved to database rules)
+    // TODO: Common merchant patterns (these could be moved to database rules)
     const merchantPatterns = [
       // Food & Dining
       {
@@ -331,13 +428,14 @@ export class TransactionCategorizationService {
     for (const rule of merchantPatterns) {
       for (const pattern of rule.patterns) {
         if (normalizedMerchant.includes(pattern)) {
-          return {
-            mainCategory: rule.category,
-            subCategory: rule.sub,
-            source: "merchant",
-            confidence: rule.confidence,
-            needsReview: false,
-          };
+          return await this.createValidatedResult(
+            db,
+            rule.category,
+            rule.sub,
+            "merchant",
+            rule.confidence,
+            false
+          );
         }
       }
     }
@@ -618,8 +716,22 @@ export class TransactionCategorizationService {
         }
       }
 
+      // Load valid category definitions for validation
+      if (this.validCategoriesCache.size === 0) {
+        const validCategories = await db
+          .select()
+          .from(categoryDefinition)
+          .where(eq(categoryDefinition.isActive, true));
+
+        this.validCategoriesCache.clear();
+        for (const category of validCategories) {
+          const cacheKey = `${category.mainCategory}:${category.subCategory}`;
+          this.validCategoriesCache.add(cacheKey);
+        }
+      }
+
       console.log(
-        `Cache refreshed: ${userRules.length} user rules, ${this.mccMappingCache.size} MCC mappings`
+        `Cache refreshed: ${userRules.length} user rules, ${this.mccMappingCache.size} MCC mappings, ${this.validCategoriesCache.size} valid categories`
       );
     } catch (error) {
       console.error("Error refreshing categorization cache:", error);
@@ -633,6 +745,7 @@ export class TransactionCategorizationService {
     this.merchantRulesCache.clear();
     this.mccMappingCache.clear();
     this.userRulesCache.clear();
+    this.validCategoriesCache.clear();
     this.lastCacheUpdate = 0;
   }
 }

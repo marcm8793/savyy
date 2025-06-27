@@ -69,8 +69,19 @@ type Transaction = {
   originalDescription: string | null;
   status: string;
   transactionType: string | null;
+
+  // Original Tink categories (preserved)
   categoryName: string | null;
   categoryId: string | null;
+
+  // Enhanced categorization fields
+  mainCategory: string | null;
+  subCategory: string | null;
+  categorySource: string | null;
+  categoryConfidence: string | null;
+  needsReview: boolean | null;
+  categorizedAt: string | null;
+
   merchantName: string | null;
   merchantCategoryCode: string | null;
   reference: string | null;
@@ -459,10 +470,39 @@ export default function TransactionsPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="hidden md:table-cell">
-                                    {transaction.categoryName ? (
-                                      <Badge variant="secondary">
-                                        {transaction.categoryName}
-                                      </Badge>
+                                    {transaction.mainCategory &&
+                                    transaction.subCategory ? (
+                                      <div className="flex flex-col gap-1">
+                                        <Badge
+                                          variant="default"
+                                          className="text-xs"
+                                        >
+                                          {transaction.mainCategory}
+                                        </Badge>
+                                        <Badge
+                                          variant="secondary"
+                                          className="text-xs"
+                                        >
+                                          {transaction.subCategory}
+                                        </Badge>
+                                        {transaction.needsReview && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-xs text-orange-600"
+                                          >
+                                            Review
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    ) : transaction.categoryName ? (
+                                      <div className="flex flex-col gap-1">
+                                        <Badge variant="secondary">
+                                          {transaction.categoryName}
+                                        </Badge>
+                                        <span className="text-xs text-muted-foreground">
+                                          Tink Category
+                                        </span>
+                                      </div>
                                     ) : (
                                       <span className="text-muted-foreground text-sm">
                                         Uncategorized

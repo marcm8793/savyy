@@ -27,7 +27,8 @@
     "webhook:test-secure": "tsx scripts/test-webhook-with-signature.ts",
     "webhook:trigger-refresh": "tsx scripts/trigger-webhook-refresh.ts",
     "webhook:list-credentials": "tsx scripts/list-credentials.ts",
-    "transaction:test-sync": "tsx scripts/test-transaction-sync.ts"
+    "transaction:test-sync": "tsx scripts/test-transaction-sync.ts",
+    "seed:categories": "tsx scripts/seed-categories.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",

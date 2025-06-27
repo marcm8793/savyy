@@ -2,16 +2,18 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, and, sql } from "drizzle-orm";
 import { schema, bankAccount, transaction } from "../../../db/schema";
 import { TinkTransaction, StorageResult } from "./types";
+import { transactionCategorizationService } from "./transactionCategorizationService";
 
 /**
  * Service responsible for storing transactions in the database
  * Handles bulk upserts, batching, and database operations
+ * Now includes automatic categorization during storage
  */
 export class TransactionStorageService {
   private readonly BATCH_SIZE = 50;
 
   /**
-   * Store transactions with bulk upsert strategy to handle duplicates
+   * Store transactions with bulk upsert strategy and automatic categorization
    * Uses PostgreSQL's ON CONFLICT to eliminate N+1 query pattern
    */
   async storeTransactionsWithUpsert(
@@ -19,10 +21,11 @@ export class TransactionStorageService {
     userId: string,
     bankAccountId: string,
     tinkTransactions: TinkTransaction[]
-  ): Promise<StorageResult> {
+  ): Promise<StorageResult & { categorized: number }> {
     const errors: string[] = [];
     let totalCreated = 0;
     let totalUpdated = 0;
+    let totalCategorized = 0;
 
     // Process in batches for better performance
     for (let i = 0; i < tinkTransactions.length; i += this.BATCH_SIZE) {
@@ -30,50 +33,82 @@ export class TransactionStorageService {
 
       try {
         await db.transaction(async (tx) => {
-          // Prepare batch data for bulk upsert with enhanced status tracking
-          const batchData = batch.map((tinkTx) => ({
-            userId,
-            tinkTransactionId: tinkTx.id,
-            tinkAccountId: tinkTx.accountId,
-            bankAccountId,
-            amount: tinkTx.amount.value.unscaledValue,
-            amountScale: parseInt(tinkTx.amount.value.scale) || 0,
-            currencyCode: tinkTx.amount.currencyCode,
-            bookedDate: tinkTx.dates.booked,
-            valueDate: tinkTx.dates.value || tinkTx.dates.booked,
-            status: tinkTx.status,
-            originalStatus: tinkTx.status, // Store original status for new transactions
-            statusLastUpdated: new Date(), // Always update status timestamp
-            displayDescription: (tinkTx.descriptions.display ?? "").substring(
-              0,
-              500
-            ),
-            originalDescription: (tinkTx.descriptions.original ?? "").substring(
-              0,
-              500
-            ),
-            providerTransactionId:
-              tinkTx.identifiers?.providerTransactionId?.substring(0, 255),
-            merchantName: tinkTx.merchantInformation?.merchantName?.substring(
-              0,
-              255
-            ),
-            merchantCategoryCode:
-              tinkTx.merchantInformation?.merchantCategoryCode?.substring(
-                0,
-                10
-              ),
-            categoryId: tinkTx.categories?.pfm?.id?.substring(0, 255),
-            categoryName: tinkTx.categories?.pfm?.name?.substring(0, 255),
-            transactionType: tinkTx.types?.type?.substring(0, 50),
-            financialInstitutionTypeCode:
-              tinkTx.types?.financialInstitutionTypeCode?.substring(0, 10),
-            reference: tinkTx.reference?.substring(0, 255),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }));
+          // ✨ NEW: Categorize the batch before storage
+          const categorizedBatch =
+            await transactionCategorizationService.categorizeBatch(
+              tx,
+              userId,
+              batch
+            );
 
-          // Bulk upsert using ON CONFLICT with enhanced status change detection
+          // Prepare batch data for bulk upsert with enhanced categorization
+          const batchData = categorizedBatch.map((categorizedTx) => {
+            const { categorization } = categorizedTx;
+
+            return {
+              userId,
+              tinkTransactionId: categorizedTx.id,
+              tinkAccountId: categorizedTx.accountId,
+              bankAccountId,
+              amount: categorizedTx.amount.value.unscaledValue,
+              amountScale: parseInt(categorizedTx.amount.value.scale) || 0,
+              currencyCode: categorizedTx.amount.currencyCode,
+              bookedDate: categorizedTx.dates.booked,
+              valueDate:
+                categorizedTx.dates.value || categorizedTx.dates.booked,
+              status: categorizedTx.status,
+              originalStatus: categorizedTx.status, // Store original status for new transactions
+              statusLastUpdated: new Date(), // Always update status timestamp
+              displayDescription: (
+                categorizedTx.descriptions.display ?? ""
+              ).substring(0, 500),
+              originalDescription: (
+                categorizedTx.descriptions.original ?? ""
+              ).substring(0, 500),
+              providerTransactionId:
+                categorizedTx.identifiers?.providerTransactionId?.substring(
+                  0,
+                  255
+                ),
+              merchantName:
+                categorizedTx.merchantInformation?.merchantName?.substring(
+                  0,
+                  255
+                ),
+              merchantCategoryCode:
+                categorizedTx.merchantInformation?.merchantCategoryCode?.substring(
+                  0,
+                  10
+                ),
+
+              // Original Tink categories (preserved)
+              categoryId: categorizedTx.categories?.pfm?.id?.substring(0, 255),
+              categoryName: categorizedTx.categories?.pfm?.name?.substring(
+                0,
+                255
+              ),
+
+              // ✨ NEW: Enhanced categorization fields
+              mainCategory: categorization.mainCategory,
+              subCategory: categorization.subCategory,
+              categorySource: categorization.source,
+              categoryConfidence: categorization.confidence.toString(),
+              needsReview: categorization.needsReview,
+              categorizedAt: new Date(),
+
+              transactionType: categorizedTx.types?.type?.substring(0, 50),
+              financialInstitutionTypeCode:
+                categorizedTx.types?.financialInstitutionTypeCode?.substring(
+                  0,
+                  10
+                ),
+              reference: categorizedTx.reference?.substring(0, 255),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+          });
+
+          // Bulk upsert using ON CONFLICT with enhanced categorization tracking
           const result = await tx
             .insert(transaction)
             .values(batchData)
@@ -95,6 +130,15 @@ export class TransactionStorageService {
                 merchantCategoryCode: sql`EXCLUDED.merchant_category_code`,
                 categoryId: sql`EXCLUDED.category_id`,
                 categoryName: sql`EXCLUDED.category_name`,
+
+                // ✨ NEW: Update categorization fields
+                mainCategory: sql`EXCLUDED.main_category`,
+                subCategory: sql`EXCLUDED.sub_category`,
+                categorySource: sql`EXCLUDED.category_source`,
+                categoryConfidence: sql`EXCLUDED.category_confidence`,
+                needsReview: sql`EXCLUDED.needs_review`,
+                categorizedAt: sql`EXCLUDED.categorized_at`,
+
                 updatedAt: sql`EXCLUDED.updated_at`,
               },
             })
@@ -113,17 +157,26 @@ export class TransactionStorageService {
 
           totalCreated += batchCreated;
           totalUpdated += batchUpdated;
+          totalCategorized += result.length; // All transactions were categorized
+
+          console.log(
+            `Batch processed: ${batchCreated} created, ${batchUpdated} updated, ${result.length} categorized`
+          );
         });
       } catch (error) {
-        const errorMsg = `Error processing batch starting at index ${i}: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`;
-        console.error(errorMsg);
-        errors.push(errorMsg);
+        console.error(`Error processing batch starting at index ${i}:`, error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        errors.push(`Batch ${i}-${i + batch.length}: ${errorMessage}`);
       }
     }
 
-    return { created: totalCreated, updated: totalUpdated, errors };
+    return {
+      created: totalCreated,
+      updated: totalUpdated,
+      errors,
+      categorized: totalCategorized,
+    };
   }
 
   /**

@@ -224,51 +224,6 @@ export class TinkService {
   }
 
   /**
-   * Get client access token for credential operations (refresh, read, write)
-   * Uses client_credentials grant type with credentials:refresh scope
-   */
-  async getCredentialsToken(): Promise<TinkTokenResponse> {
-    const requestBody = new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-      scope: "credentials:refresh,credentials:read,credentials:write",
-    });
-
-    const response = await fetch(`${this.baseUrl}/api/v1/oauth/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: requestBody,
-    });
-
-    console.log("Tink credentials token response:", {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Tink credentials token error:", errorText);
-      throw new Error(
-        `Failed to get credentials token: ${response.status} ${errorText}`
-      );
-    }
-
-    const tokenData = (await response.json()) as TinkTokenResponse;
-    console.log("Tink credentials token success:", {
-      hasAccessToken: !!tokenData.access_token,
-      tokenType: tokenData.token_type,
-      expiresIn: tokenData.expires_in,
-      scope: tokenData.scope,
-    });
-
-    return tokenData;
-  }
-
-  /**
    * Grant user access for bank account connection
    * Uses authorization grant token to delegate access to a user
    */
@@ -394,40 +349,6 @@ export class TinkService {
     });
 
     return url;
-  }
-
-  /**
-   * Parse callback URL parameters from Tink redirect
-   * Extracts credentials_id, state, and other parameters from the callback
-   */
-  parseCallbackUrl(callbackUrl: string): {
-    clientId?: string;
-    credentialsId?: string;
-    state?: string;
-    redirectUri?: string;
-  } | null {
-    try {
-      const url = new URL(callbackUrl);
-      const params = url.searchParams;
-
-      const result = {
-        clientId: params.get("client_id") || undefined,
-        credentialsId: params.get("credentials_id") || undefined,
-        state: params.get("state") || undefined,
-        redirectUri: params.get("redirect_uri") || undefined,
-      };
-
-      console.log("Parsed callback URL:", {
-        hasCredentialsId: !!result.credentialsId,
-        hasState: !!result.state,
-        clientId: result.clientId,
-      });
-
-      return result;
-    } catch (error) {
-      console.error("Failed to parse callback URL:", { callbackUrl, error });
-      return null;
-    }
   }
 
   /**

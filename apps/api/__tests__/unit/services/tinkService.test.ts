@@ -77,9 +77,19 @@ describe("TinkService", () => {
     });
 
     it("should throw error when required environment variables are missing", () => {
+      // Preserve the original value so we can restore it after the test
+      const originalValue = process.env.TINK_CLIENT_ID;
       delete process.env.TINK_CLIENT_ID;
 
-      expect(() => new TinkService()).toThrow();
+      // Assert that the thrown error mentions the specific missing variable
+      expect(() => new TinkService()).toThrow(
+        /TINK_CLIENT_ID.*required|missing/i
+      );
+
+      // Restore for other tests
+      if (originalValue !== undefined) {
+        process.env.TINK_CLIENT_ID = originalValue;
+      }
     });
   });
 

@@ -597,6 +597,25 @@ describe("TinkService", () => {
       const result = tinkService.isConsentUpdateNeeded(healthyConsent);
       expect(result).toBe(false);
     });
+
+    it("should return true for consent with both expired session and error status", () => {
+      const expiredWithErrorConsent: TinkProviderConsent = {
+        ...mockProviderConsent,
+        sessionExpiryDate: Date.now() - 3600000, // 1 hour ago (expired)
+        status: "AUTHENTICATION_ERROR",
+        detailedError: {
+          type: "USER_LOGIN_ERROR",
+          displayMessage: "Authentication failed",
+          details: {
+            reason: "INVALID_CREDENTIALS",
+            retryable: false,
+          },
+        },
+      };
+
+      const result = tinkService.isConsentUpdateNeeded(expiredWithErrorConsent);
+      expect(result).toBe(true);
+    });
   });
 
   describe("isConsentExpiringsoon", () => {
@@ -708,6 +727,22 @@ describe("TinkService", () => {
             status: "UPDATED",
             statusUpdated: now,
           },
+          {
+            accountIds: ["account-5"],
+            credentialsId: "expired-with-error-credentials",
+            providerName: "Expired With Error Bank",
+            sessionExpiryDate: now - 7200000, // 2 hours ago (expired)
+            status: "AUTHENTICATION_ERROR",
+            statusUpdated: now,
+            detailedError: {
+              type: "USER_LOGIN_ERROR",
+              displayMessage: "Authentication failed",
+              details: {
+                reason: "INVALID_CREDENTIALS",
+                retryable: false,
+              },
+            },
+          },
         ],
       };
 
@@ -720,13 +755,16 @@ describe("TinkService", () => {
 
       const result = await tinkService.analyzeConsentExpiryStatus("user-token");
 
-      expect(result.total).toBe(4);
-      expect(result.summary.expiredCount).toBe(1);
+      expect(result.total).toBe(5);
+      expect(result.summary.expiredCount).toBe(2); // Both expired-credentials and expired-with-error-credentials
       expect(result.summary.expiringSoonCount).toBe(1);
       expect(result.summary.needingUpdateCount).toBe(1);
       expect(result.summary.healthyCount).toBe(1);
-      expect(result.expired).toHaveLength(1);
+      expect(result.expired).toHaveLength(2);
       expect(result.expired[0].credentialsId).toBe("expired-credentials");
+      expect(result.expired[1].credentialsId).toBe(
+        "expired-with-error-credentials"
+      );
       expect(result.expiringSoon).toHaveLength(1);
       expect(result.expiringSoon[0].credentialsId).toBe("expiring-credentials");
       expect(result.needingUpdate).toHaveLength(1);

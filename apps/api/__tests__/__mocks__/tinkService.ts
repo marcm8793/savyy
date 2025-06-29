@@ -283,6 +283,31 @@ export const mockTinkService = {
     });
     mockTinkService.isConsentUpdateNeeded.mockReturnValue(true);
   },
+
+  setupExpiredWithErrorScenario: () => {
+    mockTinkService.listProviderConsents.mockResolvedValue({
+      providerConsents: [
+        {
+          accountIds: ["mock-account-1"],
+          credentialsId: "expired-with-error-credentials",
+          providerName: "expired-with-error-bank",
+          sessionExpiryDate: Date.now() - 3600000, // 1 hour ago (expired)
+          status: "AUTHENTICATION_ERROR",
+          statusUpdated: Date.now(),
+          detailedError: {
+            type: "USER_LOGIN_ERROR",
+            displayMessage: "Authentication failed",
+            details: {
+              reason: "INVALID_CREDENTIALS",
+              retryable: false,
+            },
+          },
+        },
+      ] as TinkProviderConsent[],
+    });
+    mockTinkService.isConsentUpdateNeeded.mockReturnValue(true);
+    mockTinkService.isConsentExpiringsoon.mockReturnValue(false); // Expired, not expiring soon
+  },
 };
 
 // Export the mock as default for easy importing

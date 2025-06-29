@@ -292,46 +292,6 @@ export class TokenService {
   }
 
   /**
-   * Get token information for a user's accounts
-   * Useful for checking token expiration and scope
-   */
-  async getTokenInfo(
-    db: NodePgDatabase<typeof schema>,
-    userId: string
-  ): Promise<{
-    accessToken: string | null;
-    tokenExpiresAt: Date | null;
-    tokenScope: string | null;
-    isExpired: boolean;
-  } | null> {
-    const accounts = await db
-      .select({
-        accessToken: bankAccount.accessToken,
-        tokenExpiresAt: bankAccount.tokenExpiresAt,
-        tokenScope: bankAccount.tokenScope,
-      })
-      .from(bankAccount)
-      .where(eq(bankAccount.userId, userId))
-      .limit(1);
-
-    if (accounts.length === 0) {
-      return null;
-    }
-
-    const account = accounts[0];
-    const isExpired = account.tokenExpiresAt
-      ? account.tokenExpiresAt < new Date()
-      : true; // Consider expired if no expiration date
-
-    return {
-      accessToken: account.accessToken,
-      tokenExpiresAt: account.tokenExpiresAt,
-      tokenScope: account.tokenScope,
-      isExpired,
-    };
-  }
-
-  /**
    * Create a secure state token with HMAC signature for OAuth flows
    */
   createSecureStateToken(userId: string): string {

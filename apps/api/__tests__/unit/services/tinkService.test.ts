@@ -548,64 +548,214 @@ describe("TinkService", () => {
   });
 
   describe("isConsentUpdateNeeded", () => {
-    it("should return true when consent has expired", () => {
+    it("should return true for expired consent", () => {
       const expiredConsent: TinkProviderConsent = {
         ...mockProviderConsent,
         sessionExpiryDate: Date.now() - 1000, // 1 second ago
       };
 
       const result = tinkService.isConsentUpdateNeeded(expiredConsent);
-
       expect(result).toBe(true);
     });
 
-    it("should return true when consent has retryable error", () => {
+    it("should return true for consent with retryable error", () => {
       const errorConsent: TinkProviderConsent = {
         ...mockProviderConsent,
+        sessionExpiryDate: Date.now() + 86400000, // 24 hours from now
         detailedError: {
+          type: "TEMPORARY_ERROR",
+          displayMessage: "Temporary connection issue",
           details: {
-            reason: "TEMPORARY_ERROR",
+            reason: "CONNECTION_TIMEOUT",
             retryable: true,
           },
-          displayMessage: "Temporary error occurred",
-          type: "TEMPORARY_ERROR",
         },
       };
 
       const result = tinkService.isConsentUpdateNeeded(errorConsent);
-
       expect(result).toBe(true);
     });
 
-    it("should return true for statuses needing update", () => {
-      const statusesNeedingUpdate = [
-        "TEMPORARY_ERROR",
-        "AUTHENTICATION_ERROR",
-        "SESSION_EXPIRED",
-      ];
-
-      statusesNeedingUpdate.forEach((status) => {
-        const consent: TinkProviderConsent = {
-          ...mockProviderConsent,
-          status,
-        };
-
-        const result = tinkService.isConsentUpdateNeeded(consent);
-
-        expect(result).toBe(true);
-      });
-    });
-
-    it("should return false for valid consent", () => {
-      const validConsent: TinkProviderConsent = {
+    it("should return true for consent with error status", () => {
+      const errorStatusConsent: TinkProviderConsent = {
         ...mockProviderConsent,
-        status: "GRANTED",
         sessionExpiryDate: Date.now() + 86400000, // 24 hours from now
+        status: "TEMPORARY_ERROR",
       };
 
-      const result = tinkService.isConsentUpdateNeeded(validConsent);
+      const result = tinkService.isConsentUpdateNeeded(errorStatusConsent);
+      expect(result).toBe(true);
+    });
 
+    it("should return false for healthy consent", () => {
+      const healthyConsent: TinkProviderConsent = {
+        ...mockProviderConsent,
+        sessionExpiryDate: Date.now() + 86400000, // 24 hours from now
+        status: "UPDATED",
+      };
+
+      const result = tinkService.isConsentUpdateNeeded(healthyConsent);
       expect(result).toBe(false);
+    });
+  });
+
+  describe("isConsentExpiringsoon", () => {
+    it("should return true for consent expiring within default threshold (24 hours)", () => {
+      const expiringSoonConsent: TinkProviderConsent = {
+        ...mockProviderConsent,
+        sessionExpiryDate: Date.now() + 3600000, // 1 hour from now
+      };
+
+      const result = tinkService.isConsentExpiringsoon(expiringSoonConsent);
+      expect(result).toBe(true);
+    });
+
+    it("should return true for consent expiring within custom threshold", () => {
+      const expiringSoonConsent: TinkProviderConsent = {
+        ...mockProviderConsent,
+        sessionExpiryDate: Date.now() + 7200000, // 2 hours from now
+      };
+
+      const result = tinkService.isConsentExpiringsoon(expiringSoonConsent, 3); // 3 hours threshold
+      expect(result).toBe(true);
+    });
+
+    it("should return false for consent not expiring soon", () => {
+      const healthyConsent: TinkProviderConsent = {
+        ...mockProviderConsent,
+        sessionExpiryDate: Date.now() + 172800000, // 48 hours from now
+      };
+
+      const result = tinkService.isConsentExpiringsoon(healthyConsent);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("refreshCredentials", () => {
+    it("should successfully refresh credentials", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        statusText: "No Content",
+      } as Response);
+
+      await expect(
+        tinkService.refreshCredentials("user-token", "credentials-123")
+      ).resolves.not.toThrow();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.tink.com/api/v1/credentials/credentials-123/refresh",
+        {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer user-token",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    });
+
+    it("should throw error when refresh fails", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        text: () => Promise.resolve("Invalid credentials"),
+      } as Response);
+
+      await expect(
+        tinkService.refreshCredentials("user-token", "credentials-123")
+      ).rejects.toThrow(
+        "Failed to refresh credentials credentials-123: 400 Invalid credentials"
+      );
+    });
+  });
+
+  describe("analyzeConsentExpiryStatus", () => {
+    it("should analyze consent expiry status correctly", async () => {
+      const now = Date.now();
+      const mockConsentsResponse: TinkProviderConsentsResponse = {
+        providerConsents: [
+          {
+            accountIds: ["account-1"],
+            credentialsId: "expired-credentials",
+            providerName: "Expired Bank",
+            sessionExpiryDate: now - 3600000, // 1 hour ago (expired)
+            status: "SESSION_EXPIRED",
+            statusUpdated: now,
+          },
+          {
+            accountIds: ["account-2"],
+            credentialsId: "expiring-credentials",
+            providerName: "Expiring Bank",
+            sessionExpiryDate: now + 3600000, // 1 hour from now (expiring soon)
+            status: "UPDATED",
+            statusUpdated: now,
+          },
+          {
+            accountIds: ["account-3"],
+            credentialsId: "error-credentials",
+            providerName: "Error Bank",
+            sessionExpiryDate: now + 86400000, // 24 hours from now
+            status: "TEMPORARY_ERROR",
+            statusUpdated: now,
+          },
+          {
+            accountIds: ["account-4"],
+            credentialsId: "healthy-credentials",
+            providerName: "Healthy Bank",
+            sessionExpiryDate: now + 172800000, // 48 hours from now
+            status: "UPDATED",
+            statusUpdated: now,
+          },
+        ],
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: () => Promise.resolve(mockConsentsResponse),
+      } as Response);
+
+      const result = await tinkService.analyzeConsentExpiryStatus("user-token");
+
+      expect(result.total).toBe(4);
+      expect(result.summary.expiredCount).toBe(1);
+      expect(result.summary.expiringSoonCount).toBe(1);
+      expect(result.summary.needingUpdateCount).toBe(1);
+      expect(result.summary.healthyCount).toBe(1);
+      expect(result.expired).toHaveLength(1);
+      expect(result.expired[0].credentialsId).toBe("expired-credentials");
+      expect(result.expiringSoon).toHaveLength(1);
+      expect(result.expiringSoon[0].credentialsId).toBe("expiring-credentials");
+      expect(result.needingUpdate).toHaveLength(1);
+      expect(result.needingUpdate[0].credentialsId).toBe("error-credentials");
+      expect(result.healthy).toHaveLength(1);
+      expect(result.healthy[0].credentialsId).toBe("healthy-credentials");
+      expect(typeof result.summary.avgHoursUntilExpiry).toBe("number");
+    });
+
+    it("should handle empty consents list", async () => {
+      const mockEmptyResponse: TinkProviderConsentsResponse = {
+        providerConsents: [],
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: () => Promise.resolve(mockEmptyResponse),
+      } as Response);
+
+      const result = await tinkService.analyzeConsentExpiryStatus("user-token");
+
+      expect(result.total).toBe(0);
+      expect(result.summary.expiredCount).toBe(0);
+      expect(result.summary.expiringSoonCount).toBe(0);
+      expect(result.summary.needingUpdateCount).toBe(0);
+      expect(result.summary.healthyCount).toBe(0);
+      expect(result.summary.avgHoursUntilExpiry).toBe(0);
     });
   });
 

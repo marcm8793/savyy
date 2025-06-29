@@ -1,4 +1,4 @@
-interface TinkTokenResponse {
+export interface TinkTokenResponse {
   access_token: string;
   refresh_token?: string;
   expires_in: number;
@@ -6,23 +6,23 @@ interface TinkTokenResponse {
   scope: string;
 }
 
-interface TinkCreateUserRequest {
+export interface TinkCreateUserRequest {
   external_user_id: string;
   id_hint: string;
   market: string;
   locale: string;
 }
 
-interface TinkCreateUserResponse {
+export interface TinkCreateUserResponse {
   user_id: string;
   external_user_id: string;
 }
 
-interface TinkGrantUserAccessResponse {
+export interface TinkGrantUserAccessResponse {
   code: string;
 }
 
-interface TinkUserAuthorizationCodeResponse {
+export interface TinkUserAuthorizationCodeResponse {
   code: string;
 }
 
@@ -613,14 +613,49 @@ export class TinkService {
    * Check if a consent needs updating based on status and expiry
    */
   isConsentUpdateNeeded(consent: TinkProviderConsent): boolean {
-    // Check if consent has expired
     const now = Date.now();
+
+    // Enhanced logging for debugging session expiry issues
+    console.log("Checking consent update need:", {
+      credentialsId: consent.credentialsId,
+      providerName: consent.providerName,
+      status: consent.status,
+      currentTimestamp: now,
+      sessionExpiryDate: consent.sessionExpiryDate,
+      sessionExpiryDateFormatted: new Date(
+        consent.sessionExpiryDate
+      ).toISOString(),
+      currentTimeFormatted: new Date(now).toISOString(),
+      timeUntilExpiry: consent.sessionExpiryDate - now,
+      timeUntilExpiryHours:
+        Math.round(
+          ((consent.sessionExpiryDate - now) / (1000 * 60 * 60)) * 100
+        ) / 100,
+      isExpired: consent.sessionExpiryDate < now,
+      hasRetryableError: !!consent.detailedError?.details?.retryable,
+    });
+
+    // Check if consent has expired
     if (consent.sessionExpiryDate && consent.sessionExpiryDate < now) {
+      console.warn("Consent has expired:", {
+        credentialsId: consent.credentialsId,
+        expiredSince: now - consent.sessionExpiryDate,
+        expiredSinceHours:
+          Math.round(
+            ((now - consent.sessionExpiryDate) / (1000 * 60 * 60)) * 100
+          ) / 100,
+      });
       return true;
     }
 
     // Check if consent has errors that are retryable
     if (consent.detailedError?.details?.retryable) {
+      console.warn("Consent has retryable error:", {
+        credentialsId: consent.credentialsId,
+        errorType: consent.detailedError.type,
+        errorReason: consent.detailedError.details.reason,
+        errorMessage: consent.detailedError.displayMessage,
+      });
       return true;
     }
 
@@ -631,7 +666,91 @@ export class TinkService {
       "SESSION_EXPIRED",
     ];
 
-    return statusesNeedingUpdate.includes(consent.status);
+    if (statusesNeedingUpdate.includes(consent.status)) {
+      console.warn("Consent status requires update:", {
+        credentialsId: consent.credentialsId,
+        status: consent.status,
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if a consent is about to expire (within the next 24 hours)
+   * This can be used to proactively refresh consents before they expire
+   */
+  isConsentExpiringsoon(
+    consent: TinkProviderConsent,
+    hoursBeforeExpiry: number = 24
+  ): boolean {
+    const now = Date.now();
+    const expiryThreshold = now + hoursBeforeExpiry * 60 * 60 * 1000;
+
+    const isExpiringSoon = !!(
+      consent.sessionExpiryDate && consent.sessionExpiryDate < expiryThreshold
+    );
+
+    if (isExpiringSoon) {
+      console.log("Consent expiring soon:", {
+        credentialsId: consent.credentialsId,
+        providerName: consent.providerName,
+        sessionExpiryDate: new Date(consent.sessionExpiryDate).toISOString(),
+        hoursUntilExpiry:
+          Math.round(
+            ((consent.sessionExpiryDate - now) / (1000 * 60 * 60)) * 100
+          ) / 100,
+        thresholdHours: hoursBeforeExpiry,
+      });
+    }
+
+    return isExpiringSoon;
+  }
+
+  /**
+   * Refresh credentials to extend session validity
+   * This should be called when a consent needs updating or is about to expire
+   */
+  async refreshCredentials(
+    userAccessToken: string,
+    credentialsId: string
+  ): Promise<void> {
+    console.log("Refreshing credentials:", { credentialsId });
+
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/credentials/${credentialsId}/refresh`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${userAccessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log("Tink credentials refresh response:", {
+      status: response.status,
+      statusText: response.statusText,
+      credentialsId,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Failed to refresh credentials:", {
+        credentialsId,
+        status: response.status,
+        error: errorText,
+      });
+      throw new Error(
+        `Failed to refresh credentials ${credentialsId}: ${response.status} ${errorText}`
+      );
+    }
+
+    // Note: This endpoint returns 204 No Content on success
+    console.log("Credentials refresh initiated successfully:", {
+      credentialsId,
+    });
   }
 
   /**
@@ -648,6 +767,103 @@ export class TinkService {
     );
 
     return consent || null;
+  }
+
+  /**
+   * Analyze all provider consents and return expiry status summary
+   * This helps with proactive session management and monitoring
+   */
+  async analyzeConsentExpiryStatus(userAccessToken: string): Promise<{
+    total: number;
+    expired: TinkProviderConsent[];
+    expiringSoon: TinkProviderConsent[];
+    needingUpdate: TinkProviderConsent[];
+    healthy: TinkProviderConsent[];
+    summary: {
+      expiredCount: number;
+      expiringSoonCount: number;
+      needingUpdateCount: number;
+      healthyCount: number;
+      avgHoursUntilExpiry: number;
+    };
+  }> {
+    const consentsResponse = await this.listProviderConsents(userAccessToken);
+    const consents = consentsResponse.providerConsents;
+
+    const expired: TinkProviderConsent[] = [];
+    const expiringSoon: TinkProviderConsent[] = [];
+    const needingUpdate: TinkProviderConsent[] = [];
+    const healthy: TinkProviderConsent[] = [];
+
+    let totalHoursUntilExpiry = 0;
+    let validExpiryCount = 0;
+
+    for (const consent of consents) {
+      const now = Date.now();
+
+      // Calculate hours until expiry for averaging
+      if (consent.sessionExpiryDate) {
+        const hoursUntilExpiry =
+          (consent.sessionExpiryDate - now) / (1000 * 60 * 60);
+        totalHoursUntilExpiry += hoursUntilExpiry;
+        validExpiryCount++;
+      }
+
+      // Categorize consents
+      if (this.isConsentUpdateNeeded(consent)) {
+        if (consent.sessionExpiryDate && consent.sessionExpiryDate < now) {
+          expired.push(consent);
+        } else {
+          needingUpdate.push(consent);
+        }
+      } else if (this.isConsentExpiringsoon(consent, 24)) {
+        expiringSoon.push(consent);
+      } else {
+        healthy.push(consent);
+      }
+    }
+
+    const avgHoursUntilExpiry =
+      validExpiryCount > 0 ? totalHoursUntilExpiry / validExpiryCount : 0;
+
+    const analysis = {
+      total: consents.length,
+      expired,
+      expiringSoon,
+      needingUpdate,
+      healthy,
+      summary: {
+        expiredCount: expired.length,
+        expiringSoonCount: expiringSoon.length,
+        needingUpdateCount: needingUpdate.length,
+        healthyCount: healthy.length,
+        avgHoursUntilExpiry: Math.round(avgHoursUntilExpiry * 100) / 100,
+      },
+    };
+
+    console.log("Consent expiry analysis:", {
+      totalConsents: analysis.total,
+      summary: analysis.summary,
+      expiredCredentials: expired.map((c) => ({
+        credentialsId: c.credentialsId,
+        providerName: c.providerName,
+        status: c.status,
+        expiredHoursAgo:
+          Math.round(
+            ((Date.now() - c.sessionExpiryDate) / (1000 * 60 * 60)) * 100
+          ) / 100,
+      })),
+      expiringSoonCredentials: expiringSoon.map((c) => ({
+        credentialsId: c.credentialsId,
+        providerName: c.providerName,
+        hoursUntilExpiry:
+          Math.round(
+            ((c.sessionExpiryDate - Date.now()) / (1000 * 60 * 60)) * 100
+          ) / 100,
+      })),
+    });
+
+    return analysis;
   }
 }
 

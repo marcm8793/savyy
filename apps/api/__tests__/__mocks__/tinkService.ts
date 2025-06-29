@@ -1,10 +1,154 @@
 import { vi } from "vitest";
+import type {
+  TinkProviderConsent,
+  TinkProviderConsentsResponse,
+  TinkTokenResponse,
+  TinkCreateUserResponse,
+  TinkGrantUserAccessResponse,
+  TinkUserAuthorizationCodeResponse,
+} from "../../src/services/tinkService";
 
 /**
  * Mock implementation of TinkService for testing
  */
 export const mockTinkService = {
-  // Authentication mocks
+  // Token and authentication mocks
+  getClientAccessToken: vi.fn().mockResolvedValue({
+    access_token: "mock-client-access-token",
+    token_type: "Bearer",
+    expires_in: 3600,
+    scope: "user:create",
+  } as TinkTokenResponse),
+
+  getAuthorizationGrantToken: vi.fn().mockResolvedValue({
+    access_token: "mock-auth-grant-token",
+    token_type: "Bearer",
+    expires_in: 3600,
+    scope: "authorization:grant",
+  } as TinkTokenResponse),
+
+  getUserAccessToken: vi.fn().mockResolvedValue({
+    access_token: "mock-user-access-token",
+    refresh_token: "mock-refresh-token",
+    token_type: "Bearer",
+    expires_in: 3600,
+    scope:
+      "accounts:read,balances:read,transactions:read,provider-consents:read",
+  } as TinkTokenResponse),
+
+  getUserAccessTokenFlow: vi.fn().mockResolvedValue({
+    access_token: "mock-user-access-token-flow",
+    refresh_token: "mock-refresh-token-flow",
+    token_type: "Bearer",
+    expires_in: 3600,
+    scope:
+      "accounts:read,balances:read,transactions:read,provider-consents:read",
+  } as TinkTokenResponse),
+
+  // User management mocks
+  createUser: vi.fn().mockResolvedValue({
+    user_id: "mock-tink-user-id",
+    external_user_id: "mock-external-user-id",
+  } as TinkCreateUserResponse),
+
+  grantUserAccess: vi.fn().mockResolvedValue({
+    code: "mock-authorization-code",
+  } as TinkGrantUserAccessResponse),
+
+  generateUserAuthorizationCode: vi.fn().mockResolvedValue({
+    code: "mock-user-auth-code",
+  } as TinkUserAuthorizationCodeResponse),
+
+  // URL building mocks
+  buildTinkUrlWithAuthorizationCode: vi
+    .fn()
+    .mockReturnValue(
+      "https://link.tink.com/1.0/transactions/connect-accounts?client_id=mock&authorization_code=mock&redirect_uri=mock&market=FR&locale=en_US"
+    ),
+
+  buildUpdateConsentUrl: vi
+    .fn()
+    .mockReturnValue(
+      "https://link.tink.com/1.0/transactions/update-consent?client_id=mock&redirect_uri=mock&credentials_id=mock&authorization_code=mock&market=FR"
+    ),
+
+  buildExtendConsentUrl: vi
+    .fn()
+    .mockReturnValue(
+      "https://link.tink.com/1.0/transactions/extend-consent?client_id=mock&redirect_uri=mock&credentials_id=mock&authorization_code=mock&market=FR"
+    ),
+
+  // Provider consent mocks
+  listProviderConsents: vi.fn().mockResolvedValue({
+    providerConsents: [
+      {
+        accountIds: ["mock-account-1", "mock-account-2"],
+        credentialsId: "mock-credentials-1",
+        providerName: "mock-bank",
+        sessionExpiryDate: Date.now() + 86400000, // 24 hours from now
+        status: "UPDATED",
+        statusUpdated: Date.now(),
+      },
+      {
+        accountIds: ["mock-account-3"],
+        credentialsId: "mock-credentials-2",
+        providerName: "mock-bank-2",
+        sessionExpiryDate: Date.now() + 172800000, // 48 hours from now
+        status: "UPDATED",
+        statusUpdated: Date.now(),
+      },
+    ] as TinkProviderConsent[],
+  } as TinkProviderConsentsResponse),
+
+  getConsentByCredentialsId: vi.fn().mockResolvedValue({
+    accountIds: ["mock-account-1", "mock-account-2"],
+    credentialsId: "mock-credentials-1",
+    providerName: "mock-bank",
+    sessionExpiryDate: Date.now() + 86400000, // 24 hours from now
+    status: "UPDATED",
+    statusUpdated: Date.now(),
+  } as TinkProviderConsent),
+
+  // New consent management methods
+  isConsentUpdateNeeded: vi.fn().mockReturnValue(false),
+
+  isConsentExpiringsoon: vi.fn().mockReturnValue(false),
+
+  refreshCredentials: vi.fn().mockResolvedValue(undefined),
+
+  analyzeConsentExpiryStatus: vi.fn().mockResolvedValue({
+    total: 2,
+    expired: [],
+    expiringSoon: [],
+    needingUpdate: [],
+    healthy: [
+      {
+        accountIds: ["mock-account-1", "mock-account-2"],
+        credentialsId: "mock-credentials-1",
+        providerName: "mock-bank",
+        sessionExpiryDate: Date.now() + 86400000,
+        status: "UPDATED",
+        statusUpdated: Date.now(),
+      },
+      {
+        accountIds: ["mock-account-3"],
+        credentialsId: "mock-credentials-2",
+        providerName: "mock-bank-2",
+        sessionExpiryDate: Date.now() + 172800000,
+        status: "UPDATED",
+        statusUpdated: Date.now(),
+      },
+    ] as TinkProviderConsent[],
+    summary: {
+      expiredCount: 0,
+      expiringSoonCount: 0,
+      needingUpdateCount: 0,
+      healthyCount: 2,
+      avgHoursUntilExpiry: 36,
+    },
+  }),
+
+  // Legacy mocks for backward compatibility
   exchangeCodeForTokens: vi.fn().mockResolvedValue({
     access_token: "mock-access-token",
     refresh_token: "mock-refresh-token",
@@ -62,7 +206,7 @@ export const mockTinkService = {
     },
   ]),
 
-  // Provider consent mocks
+  // Provider consent mocks (legacy)
   getProviderConsents: vi.fn().mockResolvedValue([
     {
       id: "mock-consent-1",
@@ -81,6 +225,63 @@ export const mockTinkService = {
         mock.mockReset();
       }
     });
+  },
+
+  // Helper to set up specific test scenarios
+  setupExpiredConsentScenario: () => {
+    mockTinkService.listProviderConsents.mockResolvedValue({
+      providerConsents: [
+        {
+          accountIds: ["mock-account-1"],
+          credentialsId: "expired-credentials",
+          providerName: "expired-bank",
+          sessionExpiryDate: Date.now() - 3600000, // 1 hour ago (expired)
+          status: "SESSION_EXPIRED",
+          statusUpdated: Date.now(),
+        },
+      ] as TinkProviderConsent[],
+    });
+    mockTinkService.isConsentUpdateNeeded.mockReturnValue(true);
+  },
+
+  setupExpiringSoonScenario: () => {
+    mockTinkService.listProviderConsents.mockResolvedValue({
+      providerConsents: [
+        {
+          accountIds: ["mock-account-1"],
+          credentialsId: "expiring-credentials",
+          providerName: "expiring-bank",
+          sessionExpiryDate: Date.now() + 3600000, // 1 hour from now (expiring soon)
+          status: "UPDATED",
+          statusUpdated: Date.now(),
+        },
+      ] as TinkProviderConsent[],
+    });
+    mockTinkService.isConsentExpiringsoon.mockReturnValue(true);
+  },
+
+  setupErrorScenario: () => {
+    mockTinkService.listProviderConsents.mockResolvedValue({
+      providerConsents: [
+        {
+          accountIds: ["mock-account-1"],
+          credentialsId: "error-credentials",
+          providerName: "error-bank",
+          sessionExpiryDate: Date.now() + 86400000,
+          status: "TEMPORARY_ERROR",
+          statusUpdated: Date.now(),
+          detailedError: {
+            type: "TEMPORARY_ERROR",
+            displayMessage: "Temporary connection issue",
+            details: {
+              reason: "CONNECTION_TIMEOUT",
+              retryable: true,
+            },
+          },
+        },
+      ] as TinkProviderConsent[],
+    });
+    mockTinkService.isConsentUpdateNeeded.mockReturnValue(true);
   },
 };
 

@@ -631,49 +631,6 @@ export class AccountsAndBalancesService {
 
     return result;
   }
-
-  /**
-   * Get account balance summary for a user
-   */
-  async getBalanceSummary(
-    db: NodePgDatabase<typeof schema>,
-    userId: string
-  ): Promise<{
-    totalBalance: number;
-    currency: string;
-    accountCount: number;
-    lastRefreshed: Date | null;
-  }> {
-    const accounts = await this.getAccountsFromDb(db, userId);
-
-    const totalBalance = accounts.reduce((sum, account) => {
-      const balance = account.balance ? parseFloat(account.balance) : 0;
-      return sum + balance;
-    }, 0);
-
-    const lastRefreshed = accounts.reduce((latest, account) => {
-      if (!account.lastRefreshed) {
-        return latest;
-      }
-      if (!latest) {
-        return account.lastRefreshed;
-      }
-      return account.lastRefreshed > latest ? account.lastRefreshed : latest;
-    }, null as Date | null);
-
-    // Use the most common currency or default to EUR
-    const currencies = accounts
-      .map((acc) => acc.currency)
-      .filter(Boolean) as string[];
-    const currency = currencies.length > 0 ? currencies[0] : "EUR";
-
-    return {
-      totalBalance: Math.round(totalBalance), // Return in cents
-      currency,
-      accountCount: accounts.length,
-      lastRefreshed,
-    };
-  }
 }
 
 // Export singleton instance

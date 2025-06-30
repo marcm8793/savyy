@@ -32,7 +32,7 @@ export class TransactionSyncService {
     } = {}
   ): Promise<SyncResult> {
     const {
-      dateRangeMonths = 12,
+      dateRangeMonths = 3,
       includeAllStatuses = true,
       skipCredentialsRefresh = false,
       isConsentRefresh = false,
@@ -340,8 +340,8 @@ export class TransactionSyncService {
       let syncStrategy: "incremental" | "full" | "status_update";
 
       if (forceFullSync || !lastSyncDate) {
-        // Full sync: get last 12 months
-        dateRange = this.createDateRange(12);
+        // Full sync: get last 3 months
+        dateRange = this.createDateRange(3);
         syncStrategy = "full";
         console.log("Using full sync strategy");
       } else {

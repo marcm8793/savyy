@@ -68,7 +68,7 @@ const syncResult = await trpc.account.syncTinkAccounts.mutate({
 // Manual sync for specific account
 const manualSync = await trpc.account.syncAccountTransactions.mutate({
   accountId: "tink_account_id",
-  dateRangeMonths: 12,
+  dateRangeMonths: 3,
   includeAllStatuses: true,
 });
 ```
@@ -77,7 +77,7 @@ const manualSync = await trpc.account.syncAccountTransactions.mutate({
 
 1. **Account Connection** → Exchange auth code for access token
 2. **Credential Refresh** → Trigger Tink to fetch latest data
-3. **Transaction Fetch** → Get last 12 months with pagination
+3. **Transaction Fetch** → Get last 3 months with pagination
 4. **Upsert Storage** → Handle duplicates gracefully
 5. **Metadata Update** → Track sync timestamps
 
@@ -305,7 +305,7 @@ const syncResult = await trpc.account.syncTinkAccounts.mutate({
 
 // Result includes:
 // - Synchronized bank accounts
-// - Initial transaction import (12 months)
+// - Initial transaction import (3 months)
 // - Success/error statistics
 ```
 

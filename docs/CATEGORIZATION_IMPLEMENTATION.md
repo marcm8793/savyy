@@ -87,7 +87,7 @@ The system applies rules in priority order:
 
    - 5-minute cache for user rules and MCC mappings
    - In-memory caching to reduce database queries
-   - Batch processing for 12 months of historical data
+   - Batch processing for 3 months of historical data
 
 2. **Batch Processing**
 
@@ -167,11 +167,11 @@ const categorization =
 
 ## 📈 Performance Characteristics
 
-### 12 Months Historical Data Processing
+### 3 Months Historical Data Processing
 
-- **Volume**: 10,000-50,000 transactions per user
-- **Processing Time**: ~2-5 seconds per 1,000 transactions
-- **Memory Usage**: ~50MB for 10,000 transactions
+- **Volume**: 2,500-12,500 transactions per user
+- **Processing Time**: ~0.5-1.25 seconds per 1,000 transactions
+- **Memory Usage**: ~12.5MB for 2,500 transactions
 - **Database Impact**: Optimized with bulk upserts and indexing
 
 ### Categorization Accuracy
@@ -312,4 +312,4 @@ transactionCategorizationService.clearCache();
 
 ---
 
-**Implementation Status**: ✅ Complete - Ready for production use with 12-month historical data processing capability.
+**Implementation Status**: ✅ Complete - Ready for production use with 3-month historical data processing capability.

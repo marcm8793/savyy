@@ -211,7 +211,8 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
                           account.tinkAccountId,
                           tokenResponse.access_token,
                           {
-                            dateRangeMonths: TRANSACTION_SYNC_CONFIG.DEFAULT_DATE_RANGE_MONTHS, // Fetch last 3 months
+                            dateRangeMonths:
+                              TRANSACTION_SYNC_CONFIG.DEFAULT_DATE_RANGE_MONTHS, // Fetch default range
                             includeAllStatuses: true, // Include PENDING and UNDEFINED
                             skipCredentialsRefresh: true, // Skip refresh to avoid scope issues
                             isConsentRefresh,

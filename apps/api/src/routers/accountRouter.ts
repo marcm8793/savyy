@@ -8,6 +8,7 @@ import { bankAccount } from "../../db/schema";
 import { tokenService } from "../services/tokenService";
 import { userService } from "../services/userService";
 import { createSelectSchema } from "drizzle-zod";
+import { TRANSACTION_SYNC_CONFIG } from "../constants/transactions";
 import { AccountsAndBalancesService } from "../services/accountsAndBalancesService";
 
 const bankAccountSchema = createSelectSchema(bankAccount, {
@@ -517,7 +518,7 @@ export const accountRouter = router({
     .input(
       z.object({
         accountId: z.string(),
-        dateRangeMonths: z.number().min(1).max(24).default(3),
+        dateRangeMonths: z.number().min(TRANSACTION_SYNC_CONFIG.MIN_DATE_RANGE_MONTHS).max(TRANSACTION_SYNC_CONFIG.MAX_DATE_RANGE_MONTHS).default(TRANSACTION_SYNC_CONFIG.DEFAULT_DATE_RANGE_MONTHS),
         includeAllStatuses: z.boolean().default(true),
       })
     )

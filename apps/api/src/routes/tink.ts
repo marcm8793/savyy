@@ -8,6 +8,7 @@ import { AccountsAndBalancesService } from "../services/accountsAndBalancesServi
 import { tokenService } from "../services/tokenService";
 import { redisService } from "../services/redisService";
 import { TransactionSyncService } from "../services/transaction/transactionSyncService";
+import { TRANSACTION_SYNC_CONFIG } from "../constants/transactions";
 
 // Validation schemas
 const connectQuerySchema = z.object({
@@ -210,7 +211,7 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
                           account.tinkAccountId,
                           tokenResponse.access_token,
                           {
-                            dateRangeMonths: 3, // Fetch last 3 months
+                            dateRangeMonths: TRANSACTION_SYNC_CONFIG.DEFAULT_DATE_RANGE_MONTHS, // Fetch last 3 months
                             includeAllStatuses: true, // Include PENDING and UNDEFINED
                             skipCredentialsRefresh: true, // Skip refresh to avoid scope issues
                             isConsentRefresh,

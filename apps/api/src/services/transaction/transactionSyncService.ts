@@ -3,6 +3,7 @@ import { schema } from "../../../db/schema";
 import { TransactionFetchService } from "./transactionFetchService";
 import { TransactionStorageService } from "./transactionStorageService";
 import { SyncResult, TransactionFetchOptions, DateRange } from "./types";
+import { TRANSACTION_SYNC_CONFIG } from "../../constants/transactions";
 
 /**
  * Core transaction sync service that orchestrates the sync process
@@ -32,7 +33,7 @@ export class TransactionSyncService {
     } = {}
   ): Promise<SyncResult> {
     const {
-      dateRangeMonths = 3,
+      dateRangeMonths = TRANSACTION_SYNC_CONFIG.DEFAULT_DATE_RANGE_MONTHS,
       includeAllStatuses = true,
       skipCredentialsRefresh = false,
       isConsentRefresh = false,
@@ -341,12 +342,12 @@ export class TransactionSyncService {
 
       if (forceFullSync || !lastSyncDate) {
         // Full sync: get last 3 months
-        dateRange = this.createDateRange(3);
+        dateRange = this.createDateRange(TRANSACTION_SYNC_CONFIG.DEFAULT_DATE_RANGE_MONTHS);
         syncStrategy = "full";
         console.log("Using full sync strategy");
       } else {
         // Incremental sync: from last sync date with some overlap for status updates
-        const overlapDays = 7; // Check last 7 days for status updates
+        const overlapDays = TRANSACTION_SYNC_CONFIG.WEBHOOK_LOOKBACK_DAYS; // Check last 7 days for status updates
         const fromDate = new Date(lastSyncDate);
         fromDate.setDate(fromDate.getDate() - overlapDays);
 
@@ -469,7 +470,7 @@ export class TransactionSyncService {
       // Get recent transactions that might have status updates
       // Focus on PENDING transactions and recent BOOKED ones
       const checkDate =
-        lastSyncDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+        lastSyncDate || new Date(Date.now() - TRANSACTION_SYNC_CONFIG.STATUS_UPDATE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000); // 30 days ago
       const extendedRange = {
         from: checkDate.toISOString().split("T")[0],
         to: new Date().toISOString().split("T")[0],

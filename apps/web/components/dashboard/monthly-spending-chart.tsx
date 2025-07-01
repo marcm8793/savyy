@@ -1,7 +1,17 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from "recharts";
 
 interface MonthlySpendingData {
@@ -21,6 +31,22 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
     },
   };
 
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Monthly Spending</CardTitle>
+          <CardDescription>Your spending pattern over time</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-[280px] text-muted-foreground">
+            No spending data available
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -28,29 +54,35 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
         <CardDescription>Your spending pattern over time</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[280px] sm:h-[330px] lg:h-[380px]">
-          <AreaChart 
+        <ChartContainer
+          config={chartConfig}
+          className="h-[280px] sm:h-[330px] lg:h-[380px]"
+        >
+          <AreaChart
             data={data}
             margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="month" 
+            <XAxis
+              dataKey="month"
               fontSize={12}
               tick={{ fontSize: 12 }}
               interval={0}
               height={60}
               tickMargin={10}
             />
-            <YAxis 
+            <YAxis
               fontSize={12}
               tick={{ fontSize: 12 }}
               tickFormatter={(value) => `€${Number(value).toLocaleString()}`}
               width={80}
             />
-            <ChartTooltip 
+            <ChartTooltip
               content={<ChartTooltipContent />}
-              formatter={(value) => [`€${Number(value).toLocaleString()}`, "Spending"]}
+              formatter={(value) => [
+                `€${Number(value).toLocaleString()}`,
+                "Spending",
+              ]}
             />
             <Area
               type="monotone"

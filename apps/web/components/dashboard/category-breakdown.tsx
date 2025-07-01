@@ -1,6 +1,12 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface CategoryData {
   count: number;
@@ -12,7 +18,10 @@ interface CategoryBreakdownProps {
   totalExpenses: number;
 }
 
-export function CategoryBreakdown({ categoryBreakdown, totalExpenses }: CategoryBreakdownProps) {
+export function CategoryBreakdown({
+  categoryBreakdown,
+  totalExpenses,
+}: CategoryBreakdownProps) {
   return (
     <Card>
       <CardHeader>
@@ -28,15 +37,26 @@ export function CategoryBreakdown({ categoryBreakdown, totalExpenses }: Category
               <div key={category} className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="font-medium">{category}</div>
-                  <div className="text-sm text-muted-foreground">{data.count} transactions</div>
+                  <div className="text-sm text-muted-foreground">
+                    {data.count} transactions
+                  </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-medium">€{Math.abs(data.amount).toLocaleString()}</div>
+                  <div className="font-medium">
+                    €{Math.abs(data.amount).toLocaleString()}
+                  </div>
                   <div className="h-2 w-24 bg-muted rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="h-full bg-primary transition-all duration-300"
-                      style={{ 
-                        width: `${Math.min(100, (Math.abs(data.amount) / totalExpenses) * 100)}%` 
+                      style={{
+                        width: `${
+                          totalExpenses > 0
+                            ? Math.min(
+                                100,
+                                (Math.abs(data.amount) / totalExpenses) * 100
+                              )
+                            : 0
+                        }%`,
                       }}
                     />
                   </div>

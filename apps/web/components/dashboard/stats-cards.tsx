@@ -1,7 +1,13 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpRight, ArrowDownRight, TrendingUp, Wallet, CreditCard } from "lucide-react";
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  TrendingUp,
+  Wallet,
+  CreditCard,
+} from "lucide-react";
 
 interface StatsCardsProps {
   totalWealth: number;
@@ -29,7 +35,12 @@ export function StatsCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {isLoading ? "..." : `€${totalWealth.toLocaleString()}`}
+            {isLoading
+              ? "..."
+              : new Intl.NumberFormat("en-EU", {
+                  style: "currency",
+                  currency: "EUR",
+                }).format(totalWealth)}
           </div>
           <p className="text-xs text-muted-foreground">
             <TrendingUp className="inline h-3 w-3 mr-1" />
@@ -45,11 +56,14 @@ export function StatsCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {isLoading ? "..." : `€${totalIncome.toLocaleString()}`}
+            {isLoading
+              ? "..."
+              : new Intl.NumberFormat("en-EU", {
+                  style: "currency",
+                  currency: "EUR",
+                }).format(totalIncome)}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Last 3 months
-          </p>
+          <p className="text-xs text-muted-foreground">Last 3 months</p>
         </CardContent>
       </Card>
 
@@ -62,9 +76,7 @@ export function StatsCards({
           <div className="text-2xl font-bold">
             {isLoading ? "..." : `€${totalExpenses.toLocaleString()}`}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Last 3 months
-          </p>
+          <p className="text-xs text-muted-foreground">Last 3 months</p>
         </CardContent>
       </Card>
 

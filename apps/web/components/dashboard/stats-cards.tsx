@@ -74,7 +74,12 @@ export function StatsCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {isLoading ? "..." : `€${totalExpenses.toLocaleString()}`}
+            {isLoading
+              ? "..."
+              : new Intl.NumberFormat("en-EU", {
+                  style: "currency",
+                  currency: "EUR",
+                }).format(totalExpenses)}
           </div>
           <p className="text-xs text-muted-foreground">Last 3 months</p>
         </CardContent>

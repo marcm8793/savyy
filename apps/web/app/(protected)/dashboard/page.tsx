@@ -19,6 +19,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { ModeToggle } from "@/components/themes/mode-toggle";
+import { DashboardContent } from "@/components/dashboard";
 
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
@@ -78,28 +79,10 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <div className="p-6 border rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">Accounts</h3>
-              <p className="text-muted-foreground">Manage your bank accounts</p>
-            </div>
-
-            <div className="p-6 border rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">Transactions</h3>
-              <p className="text-muted-foreground">
-                View your transaction history
-              </p>
-            </div>
-
-            <div className="p-6 border rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">Analytics</h3>
-              <p className="text-muted-foreground">
-                Track your spending patterns
-              </p>
-            </div>
-          </div>
+          <DashboardContent />
         </div>
       </SidebarInset>
     </SidebarProvider>
   );
 }
+

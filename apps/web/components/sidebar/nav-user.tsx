@@ -26,6 +26,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 export function NavUser({
   user,
@@ -37,6 +38,7 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
+  const router = useRouter();
 
   return (
     <SidebarMenu>
@@ -103,6 +105,8 @@ export function NavUser({
               onClick={async () => {
                 try {
                   await authClient.signOut();
+                  // Redirect to home page after successful logout
+                  router.push("/");
                 } catch (error) {
                   console.error("Error signing out:", error);
                 }

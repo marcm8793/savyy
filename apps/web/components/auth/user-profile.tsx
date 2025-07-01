@@ -3,9 +3,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "../../lib/trpc";
 import { useSession, authClient } from "../../lib/auth-client";
+import { useRouter } from "next/navigation";
 
 export function UserProfile() {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // Get session from Better Auth
   const {
@@ -39,7 +41,8 @@ export function UserProfile() {
       await authClient.signOut();
       // Invalidate all queries after sign out
       queryClient.clear();
-      window.location.reload(); // Simple reload to update UI
+      // Redirect to home page after successful logout
+      router.push("/");
     } catch (error) {
       console.error("Sign out failed:", error);
     }

@@ -28,7 +28,8 @@ export function CategoryCombobox({
   onCategoryChange,
 }: CategoryComboboxProps) {
   // Fetch categories
-  const { data: categoriesData, isLoading } = trpc.transaction.getCategories.useQuery();
+  const { data: categoriesData, isLoading } =
+    trpc.transaction.getCategories.useQuery();
 
   // Update category mutation
   const updateCategoryMutation = trpc.transaction.updateCategory.useMutation({
@@ -42,19 +43,22 @@ export function CategoryCombobox({
   const handleSelect = (value: string) => {
     // Value format: "mainCategory:subCategory"
     const [mainCategory, subCategory] = value.split(":");
-    
-    if (mainCategory && subCategory) {
+
+    if (mainCategory && subCategory && value.split(":").length === 2) {
       updateCategoryMutation.mutate({
         transactionId,
         mainCategory,
         subCategory,
       });
+    } else {
+      console.error("Invalid category value format:", value);
     }
   };
 
-  const currentValue = currentMainCategory && currentSubCategory
-    ? `${currentMainCategory}:${currentSubCategory}`
-    : undefined;
+  const currentValue =
+    currentMainCategory && currentSubCategory
+      ? `${currentMainCategory}:${currentSubCategory}`
+      : undefined;
 
   if (isLoading) {
     return (

@@ -54,6 +54,7 @@ import {
 import { ModeToggle } from "@/components/themes/mode-toggle";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { CategoryCombobox } from "@/components/transactions/category-combobox";
+import { TransactionDetailSheet } from "@/components/transactions/transaction-detail-sheet";
 
 // Use the transaction type but with serialized dates (as they come from tRPC)
 type Transaction = {
@@ -98,6 +99,8 @@ export default function TransactionsPage() {
   );
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   // Get date range for selected month
   const dateRange = useMemo(() => {
@@ -202,6 +205,12 @@ export default function TransactionsPage() {
 
     return sortedGroups;
   }, [transactions]);
+
+  // Handle mobile transaction click
+  const handleTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setIsSheetOpen(true);
+  };
 
   if (error) {
     return (
@@ -449,7 +458,11 @@ export default function TransactionsPage() {
                               const isIncome = scaledAmount > 0;
 
                               return (
-                                <TableRow key={transaction.id}>
+                                <TableRow 
+                                  key={transaction.id}
+                                  className="md:cursor-default cursor-pointer md:hover:bg-transparent hover:bg-muted/50"
+                                  onClick={() => handleTransactionClick(transaction)}
+                                >
                                   <TableCell>
                                     <div className="space-y-1">
                                       <div className="font-medium">
@@ -461,6 +474,27 @@ export default function TransactionsPage() {
                                         {transaction.reference &&
                                           `Ref: ${transaction.reference}`}
                                       </div>
+                                      {/* Mobile category indicator */}
+                                      <div className="md:hidden flex gap-1 mt-1">
+                                        {transaction.mainCategory && transaction.subCategory ? (
+                                          <>
+                                            <Badge variant="outline" className="text-xs">
+                                              {transaction.mainCategory}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-xs">
+                                              {transaction.subCategory}
+                                            </Badge>
+                                          </>
+                                        ) : transaction.categoryName ? (
+                                          <Badge variant="outline" className="text-xs">
+                                            {transaction.categoryName}
+                                          </Badge>
+                                        ) : (
+                                          <span className="text-xs text-muted-foreground">
+                                            Tap to categorize
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
                                   </TableCell>
                                   <TableCell className="hidden sm:table-cell">
@@ -470,7 +504,10 @@ export default function TransactionsPage() {
                                       )}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="hidden md:table-cell">
+                                  <TableCell 
+                                    className="hidden md:table-cell"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
                                     <CategoryCombobox
                                       transactionId={transaction.id}
                                       currentMainCategory={transaction.mainCategory}
@@ -530,6 +567,18 @@ export default function TransactionsPage() {
             </div>
           )}
         </div>
+
+        {/* Mobile Transaction Detail Sheet */}
+        <TransactionDetailSheet
+          transaction={selectedTransaction}
+          open={isSheetOpen}
+          onOpenChange={setIsSheetOpen}
+          onCategoryChange={() => {
+            // Refetch data to update the table
+            refetch();
+          }}
+          getAccountName={getAccountName}
+        />
       </SidebarInset>
     </SidebarProvider>
   );

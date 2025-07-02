@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { ModeToggle } from "@/components/themes/mode-toggle";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { CategoryCombobox } from "@/components/transactions/category-combobox";
 
 // Use the transaction type but with serialized dates (as they come from tRPC)
 type Transaction = {
@@ -470,44 +471,15 @@ export default function TransactionsPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="hidden md:table-cell">
-                                    {transaction.mainCategory &&
-                                    transaction.subCategory ? (
-                                      <div className="flex flex-col gap-1">
-                                        <Badge
-                                          variant="default"
-                                          className="text-xs"
-                                        >
-                                          {transaction.mainCategory}
-                                        </Badge>
-                                        <Badge
-                                          variant="secondary"
-                                          className="text-xs"
-                                        >
-                                          {transaction.subCategory}
-                                        </Badge>
-                                        {transaction.needsReview && (
-                                          <Badge
-                                            variant="outline"
-                                            className="text-xs text-orange-600"
-                                          >
-                                            Review
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    ) : transaction.categoryName ? (
-                                      <div className="flex flex-col gap-1">
-                                        <Badge variant="secondary">
-                                          {transaction.categoryName}
-                                        </Badge>
-                                        <span className="text-xs text-muted-foreground">
-                                          Tink Category
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-muted-foreground text-sm">
-                                        Uncategorized
-                                      </span>
-                                    )}
+                                    <CategoryCombobox
+                                      transactionId={transaction.id}
+                                      currentMainCategory={transaction.mainCategory}
+                                      currentSubCategory={transaction.subCategory}
+                                      onCategoryChange={() => {
+                                        // Refetch data to update the table
+                                        refetch();
+                                      }}
+                                    />
                                   </TableCell>
                                   <TableCell className="hidden lg:table-cell">
                                     <div className="text-sm">

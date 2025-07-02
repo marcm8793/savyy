@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { eq, and, gte, lte, inArray, desc, sql } from "drizzle-orm";
-import { transaction, bankAccount } from "../../db/schema";
+import { transaction, bankAccount, categoryDefinition } from "../../db/schema";
 import { tinkService } from "../services/tinkService";
 import { TinkWebhookService } from "../services/tinkWebhookService";
 import { tokenService } from "../services/tokenService";
@@ -927,6 +927,135 @@ export const transactionRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to calculate transaction statistics",
+        });
+      }
+    }),
+
+  // Get all available categories
+  getCategories: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      const { db } = ctx;
+
+      // Get all categories ordered by mainCategory and subCategory
+      const categories = await db
+        .select({
+          id: categoryDefinition.id,
+          mainCategory: categoryDefinition.mainCategory,
+          subCategory: categoryDefinition.subCategory,
+          icon: categoryDefinition.icon,
+          color: categoryDefinition.color,
+          sortOrder: categoryDefinition.sortOrder,
+        })
+        .from(categoryDefinition)
+        .orderBy(categoryDefinition.sortOrder, categoryDefinition.mainCategory, categoryDefinition.subCategory);
+
+      // Group categories by main category for easier UI rendering
+      const grouped = categories.reduce((acc, cat) => {
+        if (!acc[cat.mainCategory]) {
+          acc[cat.mainCategory] = {
+            mainCategory: cat.mainCategory,
+            icon: cat.icon,
+            color: cat.color,
+            subCategories: [],
+          };
+        }
+        acc[cat.mainCategory].subCategories.push({
+          id: cat.id,
+          subCategory: cat.subCategory,
+        });
+        return acc;
+      }, {} as Record<string, { mainCategory: string; icon: string | null; color: string | null; subCategories: Array<{ id: string; subCategory: string }> }>);
+
+      return {
+        categories,
+        grouped: Object.values(grouped),
+      };
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch categories",
+      });
+    }
+  }),
+
+  // Update transaction category
+  updateCategory: protectedProcedure
+    .input(
+      z.object({
+        transactionId: z.string(),
+        mainCategory: z.string(),
+        subCategory: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const { db, user } = ctx;
+
+        // Verify the transaction belongs to the user
+        const [existingTransaction] = await db
+          .select()
+          .from(transaction)
+          .where(
+            and(
+              eq(transaction.id, input.transactionId),
+              eq(transaction.userId, user.id)
+            )
+          )
+          .limit(1);
+
+        if (!existingTransaction) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Transaction not found",
+          });
+        }
+
+        // Verify the category combination exists
+        const [category] = await db
+          .select()
+          .from(categoryDefinition)
+          .where(
+            and(
+              eq(categoryDefinition.mainCategory, input.mainCategory),
+              eq(categoryDefinition.subCategory, input.subCategory)
+            )
+          )
+          .limit(1);
+
+        if (!category) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid category combination",
+          });
+        }
+
+        // Update the transaction
+        await db
+          .update(transaction)
+          .set({
+            mainCategory: input.mainCategory,
+            subCategory: input.subCategory,
+            categorySource: "user",
+            categoryConfidence: "1.00",
+            needsReview: false,
+            categorizedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(transaction.id, input.transactionId));
+
+        return {
+          success: true,
+          message: "Transaction category updated successfully",
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        console.error("Error updating transaction category:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update transaction category",
         });
       }
     }),

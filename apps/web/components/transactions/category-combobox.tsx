@@ -51,7 +51,9 @@ export function CategoryCombobox({
         subCategory,
       });
     } else {
-      console.error("Invalid category value format:", value);
+      console.warn(
+        `CategoryCombobox: Invalid category value format: "${value}". Expected format: "mainCategory:subCategory"`
+      );
     }
   };
 

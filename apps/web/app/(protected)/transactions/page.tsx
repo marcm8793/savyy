@@ -99,7 +99,8 @@ export default function TransactionsPage() {
   );
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<Transaction | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   // Get date range for selected month
@@ -458,10 +459,12 @@ export default function TransactionsPage() {
                               const isIncome = scaledAmount > 0;
 
                               return (
-                                <TableRow 
+                                <TableRow
                                   key={transaction.id}
                                   className="md:cursor-default cursor-pointer md:hover:bg-transparent hover:bg-muted/50"
-                                  onClick={() => handleTransactionClick(transaction)}
+                                  onClick={() =>
+                                    handleTransactionClick(transaction)
+                                  }
                                 >
                                   <TableCell>
                                     <div className="space-y-1">
@@ -476,21 +479,34 @@ export default function TransactionsPage() {
                                       </div>
                                       {/* Mobile category indicator */}
                                       <div className="md:hidden flex gap-1 mt-1">
-                                        {transaction.mainCategory && transaction.subCategory ? (
+                                        {transaction.mainCategory &&
+                                        transaction.subCategory ? (
                                           <>
-                                            <Badge variant="outline" className="text-xs">
+                                            <Badge
+                                              variant="outline"
+                                              className="text-xs"
+                                            >
                                               {transaction.mainCategory}
                                             </Badge>
-                                            <Badge variant="outline" className="text-xs">
+                                            <Badge
+                                              variant="outline"
+                                              className="text-xs"
+                                            >
                                               {transaction.subCategory}
                                             </Badge>
                                           </>
                                         ) : transaction.categoryName ? (
-                                          <Badge variant="outline" className="text-xs">
+                                          <Badge
+                                            variant="outline"
+                                            className="text-xs"
+                                          >
                                             {transaction.categoryName}
                                           </Badge>
                                         ) : (
-                                          <span className="text-xs text-muted-foreground">
+                                          <span
+                                            className="text-xs text-muted-foreground"
+                                            aria-label="Transaction not categorized, tap to categorize"
+                                          >
                                             Tap to categorize
                                           </span>
                                         )}
@@ -504,14 +520,18 @@ export default function TransactionsPage() {
                                       )}
                                     </div>
                                   </TableCell>
-                                  <TableCell 
+                                  <TableCell
                                     className="hidden md:table-cell"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <CategoryCombobox
                                       transactionId={transaction.id}
-                                      currentMainCategory={transaction.mainCategory}
-                                      currentSubCategory={transaction.subCategory}
+                                      currentMainCategory={
+                                        transaction.mainCategory
+                                      }
+                                      currentSubCategory={
+                                        transaction.subCategory
+                                      }
                                       onCategoryChange={() => {
                                         // Refetch data to update the table
                                         refetch();

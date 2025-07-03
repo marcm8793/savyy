@@ -731,11 +731,11 @@ if (require.main === module) {
   seedCategories()
     .then(() => {
       console.log("✅ Seeding completed");
-      process.exit(0);
+      throw new Error("Seeding completed successfully, exiting process.");
     })
     .catch((error) => {
       console.error("❌ Seeding failed:", error);
-      process.exit(1);
+      throw new Error("Seeding failed, exiting process.");
     });
 }
 

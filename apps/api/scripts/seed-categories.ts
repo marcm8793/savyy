@@ -731,7 +731,6 @@ if (require.main === module) {
   seedCategories()
     .then(() => {
       console.log("✅ Seeding completed");
-      throw new Error("Seeding completed successfully, exiting process.");
     })
     .catch((error) => {
       console.error("❌ Seeding failed:", error);

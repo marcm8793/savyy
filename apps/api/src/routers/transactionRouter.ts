@@ -947,7 +947,11 @@ export const transactionRouter = router({
           sortOrder: categoryDefinition.sortOrder,
         })
         .from(categoryDefinition)
-        .orderBy(categoryDefinition.sortOrder, categoryDefinition.mainCategory, categoryDefinition.subCategory);
+        .orderBy(
+          categoryDefinition.sortOrder,
+          categoryDefinition.mainCategory,
+          categoryDefinition.subCategory
+        );
 
       // Group categories by main category for easier UI rendering
       const grouped = categories.reduce((acc, cat) => {
@@ -1073,6 +1077,9 @@ export const transactionRouter = router({
           })
           .optional(),
         includeCategories: z.boolean().default(true),
+        limit: z.number().min(1).max(50000).default(10000), // Max 50k transactions to prevent memory issues
+        offset: z.number().min(0).default(0),
+        includeGrouping: z.boolean().default(false), // Make grouping optional due to memory concerns
       })
     )
     .query(async ({ ctx, input }) => {
@@ -1091,7 +1098,18 @@ export const transactionRouter = router({
           conditions.push(lte(transaction.bookedDate, input.dateRange.to));
         }
 
-        // Get transactions with account information
+        // Get total count for pagination info
+        const totalCountResult = await db
+          .select({
+            count: sql<number>`COUNT(*)::int`,
+          })
+          .from(transaction)
+          .leftJoin(bankAccount, eq(transaction.bankAccountId, bankAccount.id))
+          .where(and(...conditions));
+
+        const totalCount = totalCountResult[0].count;
+
+        // Get transactions with account information (paginated)
         const transactions = await db
           .select({
             id: transaction.id,
@@ -1112,33 +1130,45 @@ export const transactionRouter = router({
             merchantCategoryCode: transaction.merchantCategoryCode,
           })
           .from(transaction)
-          .leftJoin(
-            bankAccount,
-            eq(transaction.bankAccountId, bankAccount.id)
-          )
+          .leftJoin(bankAccount, eq(transaction.bankAccountId, bankAccount.id))
           .where(and(...conditions))
-          .orderBy(desc(transaction.bookedDate), desc(transaction.createdAt));
+          .orderBy(desc(transaction.bookedDate), desc(transaction.createdAt))
+          .limit(input.limit)
+          .offset(input.offset);
 
-        // Group transactions by category and day
-        const groupedTransactions = transactions.reduce((acc, txn) => {
-          const dateKey = txn.bookedDate;
-          const categoryKey = txn.mainCategory || "Uncategorized";
-          
-          if (!acc[dateKey]) {
-            acc[dateKey] = {};
-          }
-          
-          if (!acc[dateKey][categoryKey]) {
-            acc[dateKey][categoryKey] = [];
-          }
-          
-          acc[dateKey][categoryKey].push(txn);
-          return acc;
-        }, {} as Record<string, Record<string, typeof transactions>>);
+        // Only group transactions if explicitly requested and dataset is small enough
+        let groupedTransactions:
+          | Record<string, Record<string, typeof transactions>>
+          | undefined;
+
+        if (input.includeGrouping && transactions.length <= 5000) {
+          // Only group if we have <= 5000 transactions to prevent memory issues
+          groupedTransactions = transactions.reduce((acc, txn) => {
+            const dateKey = txn.bookedDate;
+            const categoryKey = txn.mainCategory || "Uncategorized";
+
+            if (!acc[dateKey]) {
+              acc[dateKey] = {};
+            }
+
+            if (!acc[dateKey][categoryKey]) {
+              acc[dateKey][categoryKey] = [];
+            }
+
+            acc[dateKey][categoryKey].push(txn);
+            return acc;
+          }, {} as Record<string, Record<string, typeof transactions>>);
+        }
 
         // Format based on requested format
-        const filename = `transactions_${new Date().toISOString().split("T")[0]}.${input.format}`;
-        
+        const filename = `transactions_${
+          new Date().toISOString().split("T")[0]
+        }.${input.format}`;
+
+        // Calculate pagination info
+        const hasMore = input.offset + transactions.length < totalCount;
+        const nextOffset = hasMore ? input.offset + input.limit : undefined;
+
         return {
           format: input.format,
           data: {
@@ -1147,6 +1177,16 @@ export const transactionRouter = router({
           },
           filename,
           count: transactions.length,
+          totalCount,
+          hasMore,
+          nextOffset,
+          currentPage: Math.floor(input.offset / input.limit) + 1,
+          totalPages: Math.ceil(totalCount / input.limit),
+          pagination: {
+            offset: input.offset,
+            limit: input.limit,
+            total: totalCount,
+          },
         };
       } catch (error) {
         if (error instanceof TRPCError) {

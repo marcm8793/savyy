@@ -110,6 +110,17 @@ export default function TransactionExportPage() {
         return;
       }
 
+      if (
+        dateRangeType === "custom" &&
+        startDate &&
+        endDate &&
+        endDate < startDate
+      ) {
+        toast.error("End date cannot be earlier than start date");
+        setIsExporting(false);
+        return;
+      }
+
       const result = await exportQuery.refetch();
 
       if (result.data) {
@@ -160,7 +171,8 @@ export default function TransactionExportPage() {
         }
         toast.success("Export completed successfully!");
       }
-    } catch {
+    } catch (error) {
+      console.error("Export failed:", error);
       toast.error("Failed to export transactions");
     } finally {
       setIsExporting(false);

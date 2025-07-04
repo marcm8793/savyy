@@ -1059,4 +1059,104 @@ export const transactionRouter = router({
         });
       }
     }),
+
+  // Export transactions in various formats
+  export: protectedProcedure
+    .input(
+      z.object({
+        format: z.enum(["csv", "xlsx"]).default("csv"),
+        accountIds: z.array(z.string()).optional(),
+        dateRange: z
+          .object({
+            from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          })
+          .optional(),
+        includeCategories: z.boolean().default(true),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        const { db, user } = ctx;
+
+        // Build where conditions
+        const conditions = [eq(transaction.userId, user.id)];
+
+        if (input.accountIds && input.accountIds.length > 0) {
+          conditions.push(inArray(transaction.tinkAccountId, input.accountIds));
+        }
+
+        if (input.dateRange) {
+          conditions.push(gte(transaction.bookedDate, input.dateRange.from));
+          conditions.push(lte(transaction.bookedDate, input.dateRange.to));
+        }
+
+        // Get transactions with account information
+        const transactions = await db
+          .select({
+            id: transaction.id,
+            accountId: transaction.tinkAccountId,
+            accountName: bankAccount.accountName,
+            bookedDate: transaction.bookedDate,
+            valueDate: transaction.valueDate,
+            amount: sql<number>`${transaction.amount}::numeric / POWER(10, COALESCE(${transaction.amountScale}, 0))`,
+            currency: transaction.currencyCode,
+            description: transaction.displayDescription,
+            originalDescription: transaction.originalDescription,
+            reference: transaction.reference,
+            status: transaction.status,
+            mainCategory: transaction.mainCategory,
+            subCategory: transaction.subCategory,
+            categoryName: transaction.categoryName,
+            merchantName: transaction.merchantName,
+            merchantCategoryCode: transaction.merchantCategoryCode,
+          })
+          .from(transaction)
+          .leftJoin(
+            bankAccount,
+            eq(transaction.bankAccountId, bankAccount.id)
+          )
+          .where(and(...conditions))
+          .orderBy(desc(transaction.bookedDate), desc(transaction.createdAt));
+
+        // Group transactions by category and day
+        const groupedTransactions = transactions.reduce((acc, txn) => {
+          const dateKey = txn.bookedDate;
+          const categoryKey = txn.mainCategory || "Uncategorized";
+          
+          if (!acc[dateKey]) {
+            acc[dateKey] = {};
+          }
+          
+          if (!acc[dateKey][categoryKey]) {
+            acc[dateKey][categoryKey] = [];
+          }
+          
+          acc[dateKey][categoryKey].push(txn);
+          return acc;
+        }, {} as Record<string, Record<string, typeof transactions>>);
+
+        // Format based on requested format
+        const filename = `transactions_${new Date().toISOString().split("T")[0]}.${input.format}`;
+        
+        return {
+          format: input.format,
+          data: {
+            transactions,
+            grouped: groupedTransactions,
+          },
+          filename,
+          count: transactions.length,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        console.error("Error exporting transactions:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to export transactions",
+        });
+      }
+    }),
 });

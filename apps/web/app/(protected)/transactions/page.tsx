@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,7 @@ import {
   RefreshCw,
   CreditCard,
   Building,
+  Download,
 } from "lucide-react";
 import {
   SidebarInset,
@@ -258,10 +260,18 @@ export default function TransactionsPage() {
                 View and analyze your transaction history
               </p>
             </div>
-            <Button onClick={() => refetch()} variant="outline" size="sm">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
+            <div className="flex gap-2">
+              <Link href="/transactions/export">
+                <Button variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Data
+                </Button>
+              </Link>
+              <Button onClick={() => refetch()} variant="outline" size="sm">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+            </div>
           </div>
 
           {/* Filters */}

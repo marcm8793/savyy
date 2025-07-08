@@ -20,6 +20,7 @@ export interface DecryptionInput {
 export interface EncryptionKey {
   id: string;
   key: Buffer;
+  salt: Buffer;
   createdAt: Date;
   isActive: boolean;
 }
@@ -30,8 +31,8 @@ export class EncryptionService {
   private readonly keyDerivationSalt: Buffer;
   private initializationPromise: Promise<void>;
 
-  constructor(masterPassword: string, keyDerivationSalt?: Buffer) {
-    this.keyDerivationSalt = keyDerivationSalt || randomBytes(32);
+  constructor(masterPassword: string, keyDerivationSalt: Buffer) {
+    this.keyDerivationSalt = keyDerivationSalt;
     this.initializationPromise = this.initializeDefaultKey(masterPassword);
   }
 
@@ -52,6 +53,7 @@ export class EncryptionService {
     const key: EncryptionKey = {
       id: keyId,
       key: derivedKey,
+      salt: this.keyDerivationSalt,
       createdAt: new Date(),
       isActive: true,
     };
@@ -67,18 +69,18 @@ export class EncryptionService {
   async addKey(
     keyId: string,
     masterPassword: string,
-    salt?: Buffer
+    salt: Buffer
   ): Promise<void> {
     await this.waitForInitialization();
     if (this.keys.has(keyId)) {
       throw new Error(`Key with ID ${keyId} already exists`);
     }
-    const keySalt = salt || randomBytes(32);
-    const derivedKey = await this.deriveKey(masterPassword, keySalt);
+    const derivedKey = await this.deriveKey(masterPassword, salt);
 
     const key: EncryptionKey = {
       id: keyId,
       key: derivedKey,
+      salt: salt,
       createdAt: new Date(),
       isActive: true,
     };
@@ -195,10 +197,15 @@ export class EncryptionService {
     return key ? key.isActive : false;
   }
 
-  async rotateKey(newMasterPassword: string): Promise<string> {
-    const newKeyId = `key_${Date.now()}_${randomBytes(8).toString("hex")}`;
+  async rotateKey(newMasterPassword: string, newSalt?: Buffer): Promise<string> {
+    // Generate a collision-resistant key ID using timestamp, random bytes, and process ID
+    const timestamp = Date.now();
+    const randomPart = randomBytes(16).toString("hex");
+    const processId = process.pid;
+    const newKeyId = `key_${timestamp}_${processId}_${randomPart}`;
 
-    await this.addKey(newKeyId, newMasterPassword);
+    const salt = newSalt || randomBytes(32);
+    await this.addKey(newKeyId, newMasterPassword, salt);
     await this.setActiveKey(newKeyId);
 
     return newKeyId;
@@ -236,7 +243,12 @@ export function getEncryptionService(): EncryptionService {
     }
 
     const saltHex = process.env.ENCRYPTION_KEY_SALT;
-    const salt = saltHex ? Buffer.from(saltHex, "hex") : undefined;
+    if (!saltHex) {
+      throw new Error(
+        "ENCRYPTION_KEY_SALT environment variable is required"
+      );
+    }
+    const salt = Buffer.from(saltHex, "hex");
 
     encryptionServiceInstance = new EncryptionService(masterPassword, salt);
   }

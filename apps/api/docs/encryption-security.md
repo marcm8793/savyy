@@ -85,8 +85,7 @@ ENCRYPTION_KEY_SALT=<generate-with-openssl-rand-hex-32>
    const email = user.email;
 
    // ✅ Use decrypted email for display
-   const email = userEncryptionService.decryptUserEmail(user);
-````
+const email = userEncryptionService.decryptUserEmail(user);
 
 2. **Use the encryption service for new sensitive fields**:
 
@@ -133,3 +132,4 @@ npm run test:run -- __tests__/unit/services/userEncryptionService.test.ts
 2. **Database-Level Encryption**: Consider column-level encryption for additional security
 3. **Key Management Service**: Integrate with AWS KMS or similar for enterprise deployments
 4. **Audit Logging**: Track access to decrypted sensitive data
+````

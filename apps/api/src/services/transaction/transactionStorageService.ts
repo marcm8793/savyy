@@ -15,6 +15,7 @@ export class TransactionStorageService {
   private readonly BATCH_SIZE = 50;
   private readonly encryptionService = getEncryptionService();
 
+  // TODO: method to be used
   /**
    * Encrypt sensitive transaction fields for storage
    */

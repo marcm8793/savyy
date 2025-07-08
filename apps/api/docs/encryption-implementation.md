@@ -11,11 +11,13 @@ The encryption system implements **application-level encryption** with **AES-256
 ### Core Components
 
 1. **EncryptionService** (`src/services/encryptionService.ts`)
+
    - Centralized encryption/decryption service
    - Key management and rotation
    - AES-256-GCM with authenticated encryption
 
 2. **Database Schema Updates** (`db/schema.ts`)
+
    - Encrypted field columns for sensitive data
    - Maintains both encrypted and plain-text fields during transition
    - Key ID tracking for key rotation support
@@ -29,8 +31,8 @@ The encryption system implements **application-level encryption** with **AES-256
 
 ### Algorithm: AES-256-GCM
 
-- **Cipher**: AES-256 (Advanced Encryption Standard with 256-bit keys)
-- **Mode**: GCM (Galois/Counter Mode)
+- **Key Derivation**: scrypt (32-byte output)
+- **Authentication**: Built-in authenticated encryption prevents tampering
 - **Key Derivation**: PBKDF2 with scrypt
 - **Authentication**: Built-in authenticated encryption prevents tampering
 
@@ -56,24 +58,29 @@ encryptionService.setActiveKey("key_2024_01");
 ## Encrypted Fields
 
 ### User Table
+
 - `email` → `encrypted_email`, `encrypted_email_iv`, `encrypted_email_auth_tag`
 - `tinkUserId` → `encrypted_tink_user_id`, `encrypted_tink_user_id_iv`, `encrypted_tink_user_id_auth_tag`
 
-### Account Table  
+### Account Table
+
 - `accessToken` → `encrypted_access_token`, `encrypted_access_token_iv`, `encrypted_access_token_auth_tag`
 - `refreshToken` → `encrypted_refresh_token`, `encrypted_refresh_token_iv`, `encrypted_refresh_token_auth_tag`
 - `idToken` → `encrypted_id_token`, `encrypted_id_token_iv`, `encrypted_id_token_auth_tag`
 - `password` → `encrypted_password`, `encrypted_password_iv`, `encrypted_password_auth_tag`
 
 ### Bank Account Table
+
 - `iban` → `encrypted_iban`, `encrypted_iban_iv`, `encrypted_iban_auth_tag`
 - `accessToken` → `encrypted_access_token`, `encrypted_access_token_iv`, `encrypted_access_token_auth_tag`
 
 ### Transaction Table
+
 - `payeeAccountNumber` → `encrypted_payee_account_number`, `encrypted_payee_account_number_iv`, `encrypted_payee_account_number_auth_tag`
 - `payerAccountNumber` → `encrypted_payer_account_number`, `encrypted_payer_account_number_iv`, `encrypted_payer_account_number_auth_tag`
 
 ### Common Fields
+
 - `encryption_key_id` - Tracks which key was used for encryption (enables key rotation)
 
 ## Implementation Flow
@@ -166,7 +173,7 @@ const newKeyId = encryptionService.rotateKey(newMasterPassword);
 ### Encryption Overhead
 
 - **CPU**: Minimal overhead for AES-GCM operations
-- **Storage**: ~40% increase for encrypted fields (IV + AuthTag + Base64 encoding)
+- **Storage**: ~33–35% increase for encrypted fields (12 B IV + 16 B AuthTag + Base64 encoding)
 - **Memory**: Negligible impact with streaming operations
 
 ### Optimization Strategies
@@ -238,11 +245,13 @@ ALTER TABLE bank_accounts ADD COLUMN encrypted_iban_auth_tag TEXT;
 ### Common Issues
 
 1. **"No active encryption key available"**
+
    - Check environment variables
    - Verify service initialization
    - Solution: Set ENCRYPTION_MASTER_PASSWORD
 
 2. **"Decryption failed"**
+
    - Data may be tampered with
    - Wrong encryption key
    - Solution: Verify key ID and data integrity
@@ -285,8 +294,9 @@ npm run db:studio
 This encryption implementation provides robust protection for sensitive financial data while maintaining application performance and developer productivity. The phased approach ensures safe migration with minimal downtime and risk.
 
 The system is designed for:
+
 - **Security**: Strong encryption with authenticated encryption
-- **Scalability**: Efficient operations with minimal overhead  
+- **Scalability**: Efficient operations with minimal overhead
 - **Maintainability**: Clean service architecture with comprehensive testing
 - **Compliance**: Meeting financial industry security requirements
 

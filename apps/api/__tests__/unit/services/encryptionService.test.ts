@@ -3,6 +3,7 @@ import {
   EncryptionService,
   resetEncryptionService,
 } from "../../../src/services/encryptionService";
+import { randomBytes } from "crypto";
 
 describe("EncryptionService", () => {
   let encryptionService: EncryptionService;
@@ -71,13 +72,15 @@ describe("EncryptionService", () => {
 
   describe("Key management", () => {
     it("should support multiple encryption keys", async () => {
-      await encryptionService.addKey("key2", "different-password");
+      const salt = randomBytes(32);
+      await encryptionService.addKey("key2", "different-password", salt);
       expect(await encryptionService.getAvailableKeys()).toContain("key2");
       expect(await encryptionService.isKeyActive("key2")).toBe(true);
     });
 
     it("should encrypt with different keys", async () => {
-      await encryptionService.addKey("key2", "different-password");
+      const salt = randomBytes(32);
+      await encryptionService.addKey("key2", "different-password", salt);
       const plaintext = "test with different keys";
 
       const encrypted1 = await encryptionService.encrypt(plaintext);

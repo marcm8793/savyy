@@ -3,6 +3,8 @@ import { eq, and, sql } from "drizzle-orm";
 import { schema, bankAccount, transaction } from "../../../db/schema";
 import { TinkTransaction, StorageResult } from "./types";
 import { transactionCategorizationService } from "./transactionCategorizationService";
+import { getEncryptionService } from "../encryptionService";
+import { encryptionResultToFields } from "../../types/encryption";
 
 /**
  * Service responsible for storing transactions in the database
@@ -11,6 +13,53 @@ import { transactionCategorizationService } from "./transactionCategorizationSer
  */
 export class TransactionStorageService {
   private readonly BATCH_SIZE = 50;
+  private readonly encryptionService = getEncryptionService();
+
+  /**
+   * Encrypt sensitive transaction fields for storage
+   */
+  private async encryptTransactionData(
+    payeeAccountNumber: string | null,
+    payerAccountNumber: string | null
+  ) {
+    const encryptedFields: {
+      encryptedPayeeAccountNumber?: string | null;
+      encryptedPayeeAccountNumberIv?: string | null;
+      encryptedPayeeAccountNumberAuthTag?: string | null;
+      encryptedPayerAccountNumber?: string | null;
+      encryptedPayerAccountNumberIv?: string | null;
+      encryptedPayerAccountNumberAuthTag?: string | null;
+      encryptionKeyId?: string | null;
+    } = {};
+
+    // Encrypt payee account number if provided
+    if (payeeAccountNumber) {
+      const encryptedPayee = await this.encryptionService.encrypt(
+        payeeAccountNumber
+      );
+      const payeeFields = encryptionResultToFields(encryptedPayee);
+      encryptedFields.encryptedPayeeAccountNumber = payeeFields.encryptedData;
+      encryptedFields.encryptedPayeeAccountNumberIv = payeeFields.iv;
+      encryptedFields.encryptedPayeeAccountNumberAuthTag = payeeFields.authTag;
+      encryptedFields.encryptionKeyId = payeeFields.keyId;
+    }
+
+    // Encrypt payer account number if provided
+    if (payerAccountNumber) {
+      const encryptedPayer = await this.encryptionService.encrypt(
+        payerAccountNumber
+      );
+      const payerFields = encryptionResultToFields(encryptedPayer);
+      encryptedFields.encryptedPayerAccountNumber = payerFields.encryptedData;
+      encryptedFields.encryptedPayerAccountNumberIv = payerFields.iv;
+      encryptedFields.encryptedPayerAccountNumberAuthTag = payerFields.authTag;
+      if (!encryptedFields.encryptionKeyId) {
+        encryptedFields.encryptionKeyId = payerFields.keyId;
+      }
+    }
+
+    return encryptedFields;
+  }
 
   /**
    * Store transactions with bulk upsert strategy and automatic categorization

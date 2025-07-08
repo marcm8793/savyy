@@ -5,6 +5,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TransactionQueryService } from "../../../../src/services/transaction/transactionQueryService";
 import type { TinkTransactionFilters } from "../../../../src/services/transaction/transactionQueryService";
 
+// Mock the encryption service
+vi.mock("../../../../src/services/encryptionService", () => ({
+  getEncryptionService: vi.fn(() => ({
+    decrypt: vi.fn((data: any) => {
+      if (data.encryptedData.startsWith("encrypted_")) {
+        return data.encryptedData.replace("encrypted_", "");
+      }
+      return data.encryptedData;
+    }),
+  })),
+}));
+
 describe("TransactionQueryService", () => {
   let service: TransactionQueryService;
   let mockDb: any;
@@ -62,7 +74,7 @@ describe("TransactionQueryService", () => {
         })),
       })),
       // Method to override the result for specific tests
-      __setMockResult: (result) => {
+      __setMockResult: (result: any) => {
         mockResult = result;
       },
       // For backward compatibility with existing tests

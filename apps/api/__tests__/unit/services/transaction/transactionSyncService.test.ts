@@ -2,9 +2,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { TransactionSyncService } from "../../../../src/services/transaction/transactionSyncService";
-import { TransactionFetchService } from "../../../../src/services/transaction/transactionFetchService";
-import { TransactionStorageService } from "../../../../src/services/transaction/transactionStorageService";
 import { TRANSACTION_SYNC_CONFIG } from "../../../../src/constants/transactions";
 import type {
   SyncResult,
@@ -15,9 +12,43 @@ import type {
   StorageResult,
 } from "../../../../src/services/transaction/types";
 
+// Mock TinkService before importing anything that uses it
+vi.mock("../../../../src/services/tinkService", () => {
+  const mockTinkService = {
+    getAuthorizationGrantToken: vi.fn(),
+  };
+  return {
+    TinkService: vi.fn().mockImplementation(() => mockTinkService),
+    tinkService: mockTinkService,
+  };
+});
+
+// Mock encryption service before importing anything that uses it
+vi.mock("../../../../src/services/encryptionService", () => {
+  const mockEncryptionService = {
+    encrypt: vi.fn().mockResolvedValue({
+      encryptedData: "encrypted-data",
+      iv: "mock-iv",
+      authTag: "mock-auth-tag",
+      keyId: "mock-key-id",
+    }),
+    decrypt: vi.fn().mockResolvedValue("decrypted-data"),
+    getActiveKeyId: vi.fn().mockResolvedValue("mock-key-id"),
+  };
+  return {
+    getEncryptionService: vi.fn(() => mockEncryptionService),
+    resetEncryptionService: vi.fn(),
+  };
+});
+
 // Mock the dependencies
 vi.mock("../../../../src/services/transaction/transactionFetchService");
 vi.mock("../../../../src/services/transaction/transactionStorageService");
+
+// Import after mocking
+import { TransactionSyncService } from "../../../../src/services/transaction/transactionSyncService";
+import { TransactionFetchService } from "../../../../src/services/transaction/transactionFetchService";
+import { TransactionStorageService } from "../../../../src/services/transaction/transactionStorageService";
 
 describe("TransactionSyncService", () => {
   let syncService: TransactionSyncService;

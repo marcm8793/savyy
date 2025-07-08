@@ -1,6 +1,7 @@
 import { z } from "zod/v4";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
 import { userService } from "../services/userService";
+import { userEncryptionService } from "../services/userEncryptionService";
 import { createDatabase } from "../../db/db";
 
 // Auth schemas - these should match the user table constraints
@@ -92,15 +93,12 @@ export const authRouter = router({
           input
         );
 
+        // Return decrypted user data
+        const user = userEncryptionService.prepareUserForFrontend(updatedUser);
+
         return {
           message: "Profile updated successfully",
-          user: {
-            id: updatedUser.id,
-            name: updatedUser.name,
-            firstName: updatedUser.firstName,
-            lastName: updatedUser.lastName,
-            email: updatedUser.email,
-          },
+          user,
         };
       } catch (error) {
         throw new Error(

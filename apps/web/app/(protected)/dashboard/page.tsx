@@ -3,6 +3,7 @@
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useDecryptedUser } from "@/hooks/use-decrypted-user";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import {
   Breadcrumb,
@@ -23,6 +24,7 @@ import { DashboardContent } from "@/components/dashboard";
 
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
+  const { user, isLoading: userLoading, isAuthenticated } = useDecryptedUser();
   const router = useRouter();
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function DashboardPage() {
     }
   }, [session, isPending, router]);
 
-  if (isPending) {
+  if (isPending || userLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -40,7 +42,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!session?.user) {
+  if (!session?.user || !isAuthenticated) {
     return null; // Will redirect
   }
 
@@ -75,7 +77,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold">Dashboard</h1>
             <div className="text-sm text-muted-foreground">
-              Welcome back, {session.user.name || session.user.email}!
+              Welcome back, {user?.name || user?.email || "User"}!
             </div>
           </div>
 
@@ -85,4 +87,3 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
-

@@ -3,6 +3,7 @@
 import { useSession } from "../../lib/auth-client";
 import { trpc } from "../../lib/trpc";
 import { config } from "../../lib/config";
+import { useDecryptedUser } from "@/hooks/use-decrypted-user";
 
 export function AuthDebug() {
   const {
@@ -11,6 +12,11 @@ export function AuthDebug() {
     error: sessionError,
   } = useSession();
   const trpcSessionQuery = trpc.auth.getSession.useQuery();
+  const {
+    user: decryptedUser,
+    isLoading: decryptedLoading,
+    isAuthenticated,
+  } = useDecryptedUser();
 
   return (
     <div className="p-6 border rounded-lg space-y-4 bg-gray-50 dark:bg-gray-800">
@@ -38,7 +44,7 @@ export function AuthDebug() {
 
       {/* Better Auth Session */}
       <div>
-        <h3 className="font-semibold">Better Auth Session:</h3>
+        <h3 className="font-semibold">Better Auth Session (Hashed Email):</h3>
         <div className="bg-white p-3 rounded text-sm dark:bg-gray-700">
           <p>
             <strong>Loading:</strong> {sessionLoading ? "Yes" : "No"}
@@ -56,10 +62,53 @@ export function AuthDebug() {
                 <strong>User ID:</strong> {session.user?.id}
               </p>
               <p>
-                <strong>Email:</strong> {session.user?.email}
+                <strong>Email (HASHED):</strong>{" "}
+                <span className="text-red-600 font-mono text-xs">
+                  {session.user?.email}
+                </span>
               </p>
               <p>
                 <strong>Name:</strong> {session.user?.name || "Not set"}
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Decrypted User Data */}
+      <div>
+        <h3 className="font-semibold">Decrypted User Data (Real Email):</h3>
+        <div className="bg-green-50 p-3 rounded text-sm dark:bg-gray-700">
+          <p>
+            <strong>Loading:</strong> {decryptedLoading ? "Yes" : "No"}
+          </p>
+          <p>
+            <strong>Authenticated:</strong> {isAuthenticated ? "Yes" : "No"}
+          </p>
+          <p>
+            <strong>User exists:</strong> {decryptedUser ? "Yes" : "No"}
+          </p>
+          {decryptedUser && (
+            <>
+              <p>
+                <strong>User ID:</strong> {decryptedUser.id}
+              </p>
+              <p>
+                <strong>Email (DECRYPTED):</strong>{" "}
+                <span className="text-green-600 font-semibold">
+                  {decryptedUser.email}
+                </span>
+              </p>
+              <p>
+                <strong>Name:</strong> {decryptedUser.name || "Not set"}
+              </p>
+              <p>
+                <strong>First Name:</strong>{" "}
+                {decryptedUser.firstName || "Not set"}
+              </p>
+              <p>
+                <strong>Last Name:</strong>{" "}
+                {decryptedUser.lastName || "Not set"}
               </p>
             </>
           )}

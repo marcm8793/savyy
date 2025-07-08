@@ -2,14 +2,34 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { TransactionStorageService } from "../../../../src/services/transaction/transactionStorageService";
-import { transactionCategorizationService } from "../../../../src/services/transaction/transactionCategorizationService";
 import type { TinkTransaction } from "../../../../src/services/transaction/types";
+
+// Mock the encryption service before importing anything that uses it
+vi.mock("../../../../src/services/encryptionService", () => {
+  const mockEncryptionService = {
+    encrypt: vi.fn().mockResolvedValue({
+      encryptedData: "encrypted-data",
+      iv: "mock-iv",
+      authTag: "mock-auth-tag",
+      keyId: "mock-key-id",
+    }),
+    decrypt: vi.fn().mockResolvedValue("decrypted-data"),
+    getActiveKeyId: vi.fn().mockResolvedValue("mock-key-id"),
+  };
+  return {
+    getEncryptionService: vi.fn(() => mockEncryptionService),
+    resetEncryptionService: vi.fn(),
+  };
+});
 
 // Mock the categorization service
 vi.mock(
   "../../../../src/services/transaction/transactionCategorizationService"
 );
+
+// Import after mocking
+import { TransactionStorageService } from "../../../../src/services/transaction/transactionStorageService";
+import { transactionCategorizationService } from "../../../../src/services/transaction/transactionCategorizationService";
 
 describe("TransactionStorageService", () => {
   let service: TransactionStorageService;
@@ -139,10 +159,10 @@ describe("TransactionStorageService", () => {
       from: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
       // Method to override the result for specific tests
-      __setMockResult: (result) => {
+      __setMockResult: (result: any) => {
         mockResult = result;
       },
-      __setTransactionResult: (result) => {
+      __setTransactionResult: (result: any) => {
         mockTransactionResult = result;
       },
     };

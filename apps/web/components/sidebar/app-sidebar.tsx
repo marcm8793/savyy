@@ -25,7 +25,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import { useSession } from "@/lib/auth-client";
+import { useUserDisplayData } from "@/hooks/use-decrypted-user";
 
 // This is sample data for navigation and projects - keeping this for non-user data
 const data = {
@@ -137,20 +137,8 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { data: session } = useSession();
-
-  // Create user data from session, with fallbacks for when session is loading or unavailable
-  const userData = session?.user
-    ? {
-        name: session.user.name || session.user.email || "User",
-        email: session.user.email || "",
-        avatar: session.user.image || "/avatars/default.jpg", // You can add a default avatar
-      }
-    : {
-        name: "Loading...",
-        email: "",
-        avatar: "/avatars/default.jpg",
-      };
+  // Use decrypted user data instead of raw session data
+  const userData = useUserDisplayData();
 
   return (
     <Sidebar collapsible="icon" {...props}>

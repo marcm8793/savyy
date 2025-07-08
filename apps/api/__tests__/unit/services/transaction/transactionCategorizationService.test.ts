@@ -57,7 +57,7 @@ describe("TransactionCategorizationService", () => {
     service = new TransactionCategorizationService();
 
     // Create a flexible mock that can handle both chaining and direct mocking
-    let mockResult = [];
+    let mockResult: any[] = [];
 
     // Create a chainable mock that can be overridden
     const createChainableMock = () => ({
@@ -65,7 +65,7 @@ describe("TransactionCategorizationService", () => {
       where: vi.fn(() => createChainableMock()),
       orderBy: vi.fn(() => createChainableMock()),
       limit: vi.fn(() => Promise.resolve(mockResult)),
-      then: vi.fn((cb) => Promise.resolve(mockResult).then(cb)),
+      then: vi.fn((cb: any) => Promise.resolve(mockResult).then(cb)),
     });
 
     mockDb = {

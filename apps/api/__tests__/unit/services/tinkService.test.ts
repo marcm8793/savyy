@@ -1,9 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { TinkService } from "../../../src/services/tinkService";
 import type {
   TinkProviderConsent,
   TinkProviderConsentsResponse,
 } from "../../../src/services/tinkService";
+
+// We need to use dynamic import to avoid singleton instantiation
+let TinkService: any;
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -54,11 +58,18 @@ const mockProviderConsentsResponse: TinkProviderConsentsResponse = {
 };
 
 describe("TinkService", () => {
-  let tinkService: TinkService;
+  let tinkService: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Set up environment variables
     Object.assign(process.env, mockEnv);
+
+    // Clear module cache to ensure fresh import
+    vi.resetModules();
+
+    // Dynamically import to avoid singleton issues
+    const module = await import("../../../src/services/tinkService.js");
+    TinkService = module.TinkService;
 
     // Create new instance for each test
     tinkService = new TinkService();
@@ -69,6 +80,10 @@ describe("TinkService", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Clean up environment variables
+    Object.keys(mockEnv).forEach((key) => {
+      delete process.env[key];
+    });
   });
 
   describe("constructor", () => {
@@ -77,19 +92,17 @@ describe("TinkService", () => {
     });
 
     it("should throw error when required environment variables are missing", () => {
-      // Preserve the original value so we can restore it after the test
-      const originalValue = process.env.TINK_CLIENT_ID;
+      // Temporarily clear one required env var
+      const originalClientId = process.env.TINK_CLIENT_ID;
       delete process.env.TINK_CLIENT_ID;
 
-      // Assert that the thrown error mentions the specific missing variable
+      // Assert that the thrown error mentions missing variables
       expect(() => new TinkService()).toThrow(
-        /TINK_CLIENT_ID.*required|missing/i
+        /Missing required Tink environment variables/
       );
 
-      // Restore for other tests
-      if (originalValue !== undefined) {
-        process.env.TINK_CLIENT_ID = originalValue;
-      }
+      // Restore the env var
+      process.env.TINK_CLIENT_ID = originalClientId;
     });
   });
 

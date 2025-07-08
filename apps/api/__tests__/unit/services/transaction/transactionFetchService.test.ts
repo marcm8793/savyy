@@ -2,21 +2,31 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { TransactionFetchService } from "../../../../src/services/transaction/transactionFetchService";
-import { TinkService } from "../../../../src/services/tinkService";
-import { httpRetry } from "../../../../src/utils/httpRetry";
 import type {
   TinkTransactionsResponse,
   DateRange,
 } from "../../../../src/services/transaction/types";
 
-// Mock dependencies
-vi.mock("../../../../src/services/tinkService");
+// Use vi.hoisted to create mock functions that can be used in vi.mock
+const mockTinkService = vi.hoisted(() => ({
+  getAuthorizationGrantToken: vi.fn(),
+}));
+
+// Mock TinkService before importing anything that uses it
+vi.mock("../../../../src/services/tinkService", () => ({
+  TinkService: vi.fn(() => mockTinkService),
+  tinkService: mockTinkService,
+}));
+
+// Mock httpRetry
 vi.mock("../../../../src/utils/httpRetry");
+
+// Import after mocking
+import { TransactionFetchService } from "../../../../src/services/transaction/transactionFetchService";
+import { httpRetry } from "../../../../src/utils/httpRetry";
 
 describe("TransactionFetchService", () => {
   let service: TransactionFetchService;
-  let mockTinkService: any;
   let mockHttpRetry: any;
   let mockDb: any;
 
@@ -71,7 +81,6 @@ describe("TransactionFetchService", () => {
     service = new TransactionFetchService();
 
     // Get mocked instances
-    mockTinkService = vi.mocked(TinkService.prototype);
     mockHttpRetry = vi.mocked(httpRetry);
 
     // Mock database

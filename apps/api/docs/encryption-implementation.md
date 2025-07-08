@@ -33,8 +33,6 @@ The encryption system implements **application-level encryption** with **AES-256
 
 - **Key Derivation**: scrypt (32-byte output)
 - **Authentication**: Built-in authenticated encryption prevents tampering
-- **Key Derivation**: PBKDF2 with scrypt
-- **Authentication**: Built-in authenticated encryption prevents tampering
 
 ### Security Properties
 

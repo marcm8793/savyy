@@ -7,7 +7,24 @@ import { categoryDefinition, mccCategoryMapping } from "../db/schema";
  * Run with: npm run seed:categories
  */
 
-const defaultCategories = [
+interface CategoryDefinition {
+  main: string;
+  sub: string;
+  description: string;
+  icon: string;
+  color: string;
+  sortOrder: number;
+}
+
+interface MCCMapping {
+  code: string;
+  description: string;
+  main: string;
+  sub: string;
+  confidence: number;
+}
+
+const defaultCategories: CategoryDefinition[] = [
   // Bills & Utilities
   {
     main: "Bills & Utilities",
@@ -877,7 +894,7 @@ const defaultCategories = [
   },
   {
     main: "Education & Children",
-    sub: "Education & Children - O",
+    sub: "Education & Children - Others",
     description: "Other education expenses",
     icon: "BookOpen",
     color: "#F59E0B",
@@ -934,7 +951,7 @@ const defaultCategories = [
 ];
 
 // Common MCC codes and their mappings
-const mccMappings = [
+const mccMappings: MCCMapping[] = [
   // Food & Dining
   {
     code: "5411",
@@ -1190,7 +1207,7 @@ const mccMappings = [
     sub: "Taxes - Others",
     confidence: 0.8,
   },
-  
+
   // Additional mappings for new categories
   {
     code: "4899",

@@ -128,3 +128,8 @@ npm run transaction:test-sync  # Test transaction sync functionality
    - Modify schema in `/apps/api/db/schema/`
    - Run `npm run db:generate` after schema changes
    - Run `npm run db:push` to apply changes
+
+## Code Style Guidelines
+
+- **Type Safety**:
+  - Never use `any` as a type

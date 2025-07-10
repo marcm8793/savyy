@@ -41,7 +41,7 @@ export function AccountDistributionChart({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-[250px] text-muted-foreground">
+          <div className="flex items-center justify-center h-[180px] xs:h-[200px] sm:h-[220px] md:h-[250px] lg:h-[280px] xl:h-[320px] text-muted-foreground text-sm sm:text-base">
             No account data available
           </div>
         </CardContent>
@@ -58,15 +58,15 @@ export function AccountDistributionChart({
       <CardContent>
         <ChartContainer
           config={chartConfig}
-          className="h-[250px] sm:h-[300px] lg:h-[350px]"
+          className="h-[180px] xs:h-[200px] sm:h-[220px] md:h-[250px] lg:h-[280px] xl:h-[320px]"
         >
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius="30%"
-              outerRadius="70%"
+              innerRadius="25%"
+              outerRadius="60%"
               dataKey="value"
             >
               {data.map((entry, index) => (
@@ -82,7 +82,7 @@ export function AccountDistributionChart({
             />
             <ChartLegend
               content={<ChartLegendContent />}
-              className="flex-wrap justify-center gap-1 text-xs"
+              className="flex-wrap justify-center gap-1 text-[10px] sm:text-xs md:text-sm"
             />
           </PieChart>
         </ChartContainer>

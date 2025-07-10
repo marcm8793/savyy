@@ -39,7 +39,7 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
           <CardDescription>Your spending pattern over time</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-[280px] text-muted-foreground">
+          <div className="flex items-center justify-center h-[200px] xs:h-[220px] sm:h-[250px] md:h-[280px] lg:h-[320px] xl:h-[350px] text-muted-foreground text-sm sm:text-base">
             No spending data available
           </div>
         </CardContent>
@@ -56,26 +56,35 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
       <CardContent>
         <ChartContainer
           config={chartConfig}
-          className="h-[280px] sm:h-[330px] lg:h-[380px]"
+          className="h-[200px] xs:h-[220px] sm:h-[250px] md:h-[280px] lg:h-[320px] xl:h-[350px]"
         >
           <AreaChart
             data={data}
-            margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
+            margin={{ 
+              top: 10, 
+              right: 10, 
+              left: 0, 
+              bottom: 30,
+            }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="month"
-              fontSize={12}
-              tick={{ fontSize: 12 }}
-              interval={0}
-              height={60}
-              tickMargin={10}
+              fontSize={10}
+              tick={{ fontSize: 10 }}
+              interval="preserveStartEnd"
+              height={40}
+              tickMargin={5}
+              angle={-45}
+              textAnchor="end"
+              className="text-xs sm:text-sm"
             />
             <YAxis
-              fontSize={12}
-              tick={{ fontSize: 12 }}
+              fontSize={10}
+              tick={{ fontSize: 10 }}
               tickFormatter={(value) => `€${Number(value).toLocaleString()}`}
-              width={80}
+              width={60}
+              className="text-xs sm:text-sm"
             />
             <ChartTooltip
               content={<ChartTooltipContent />}

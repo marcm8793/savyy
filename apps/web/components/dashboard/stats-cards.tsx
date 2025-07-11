@@ -86,7 +86,7 @@ export function StatsCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {isLoading ? "..." : formatSimpleAmount(averageDailySpending, "EUR", locale).replace(/\.\d{2}$/, "")}
+            {isLoading ? "..." : formatSimpleAmount(averageDailySpending, "EUR", locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </div>
           <p className="text-xs text-muted-foreground">
             Daily spending average

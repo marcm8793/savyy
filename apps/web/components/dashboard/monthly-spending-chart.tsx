@@ -85,7 +85,7 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
             <YAxis
               fontSize={10}
               tick={{ fontSize: 10 }}
-              tickFormatter={(value) => formatSimpleAmount(Number(value), "EUR", locale).replace(/\.\d{2}$/, "")}
+              tickFormatter={(value) => formatSimpleAmount(Number(value), "EUR", locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               width={60}
               className="text-xs sm:text-sm"
             />

@@ -75,6 +75,41 @@ export function useDecryptedUser(): UseDecryptedUserResult {
 }
 
 /**
+ * Generates initials from first and last name
+ */
+function generateInitials(
+  firstName?: string | null,
+  lastName?: string | null,
+  fallbackName?: string
+): string {
+  if (firstName && lastName) {
+    return `${firstName.charAt(0).toUpperCase()}${lastName
+      .charAt(0)
+      .toUpperCase()}`;
+  }
+
+  if (firstName) {
+    return firstName.charAt(0).toUpperCase();
+  }
+
+  if (lastName) {
+    return lastName.charAt(0).toUpperCase();
+  }
+
+  if (fallbackName) {
+    const names = fallbackName.split(" ");
+    if (names.length >= 2) {
+      return `${names[0].charAt(0).toUpperCase()}${names[1]
+        .charAt(0)
+        .toUpperCase()}`;
+    }
+    return names[0].charAt(0).toUpperCase();
+  }
+
+  return "U";
+}
+
+/**
  * Hook specifically for getting user display data with fallbacks
  *
  * @returns User data suitable for UI display with proper fallbacks
@@ -86,7 +121,8 @@ export function useUserDisplayData() {
     return {
       name: "Loading...",
       email: "Loading...",
-      avatar: "/avatars/default.jpg",
+      avatar: null,
+      initials: "L",
       isLoading: true,
     };
   }
@@ -95,15 +131,19 @@ export function useUserDisplayData() {
     return {
       name: "Guest",
       email: "",
-      avatar: "/avatars/default.jpg",
+      avatar: null,
+      initials: "G",
       isLoading: false,
     };
   }
 
+  const initials = generateInitials(user.firstName, user.lastName, user.name);
+
   return {
     name: user.name || user.email || "User",
     email: user.email || "",
-    avatar: user.image || "/avatars/default.jpg",
+    avatar: user.image || null,
+    initials,
     isLoading: false,
   };
 }

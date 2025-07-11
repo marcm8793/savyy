@@ -67,14 +67,14 @@ export function TransactionDetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
-        <SheetHeader>
+        <SheetHeader className="px-4">
           <SheetTitle>Transaction Details</SheetTitle>
           <SheetDescription>
             View and edit transaction information
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className="mt-6 space-y-6 px-4">
           {/* Amount and Status */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">

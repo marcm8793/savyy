@@ -511,7 +511,7 @@ export default function TransactionsPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell
-                                    className="hidden md:table-cell"
+                                    className="hidden md:table-cell whitespace-normal"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <CategoryCombobox

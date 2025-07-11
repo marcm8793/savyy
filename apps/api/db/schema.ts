@@ -28,10 +28,7 @@ export const user = pgTable("user", {
   image: text("image"),
   role: userRole("role").default("user").notNull(),
   tinkUserId: text("tink_user_id"),
-  // Encrypted fields
-  encryptedEmail: text("encrypted_email"),
-  encryptedEmailIv: text("encrypted_email_iv"),
-  encryptedEmailAuthTag: text("encrypted_email_auth_tag"),
+  // Encrypted fields (keeping only tinkUserId encryption)
   encryptedTinkUserId: text("encrypted_tink_user_id"),
   encryptedTinkUserIdIv: text("encrypted_tink_user_id_iv"),
   encryptedTinkUserIdAuthTag: text("encrypted_tink_user_id_auth_tag"),

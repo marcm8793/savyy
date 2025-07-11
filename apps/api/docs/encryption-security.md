@@ -1,35 +1,35 @@
-# User Data Encryption
+# Data Encryption Security
 
 ## Overview
 
-This document explains how sensitive user data is encrypted and stored in the Savyy application.
+This document explains how sensitive user data is encrypted and stored in the Savyy application to ensure data security and compliance with financial industry standards.
 
 ## Approach
 
-### Dual Storage Strategy
+### Selective Encryption Strategy
 
-For user email addresses, we use a dual storage approach:
+The application encrypts sensitive financial data while maintaining plain text storage for fields required by authentication systems:
 
-1. **Plain Email**: Stored in the `user.email` field for Better Auth authentication and uniqueness constraints
-2. **Encrypted Email**: Stored in encrypted fields (`encryptedEmail`, `encryptedEmailIv`, `encryptedEmailAuthTag`)
+1. **User Authentication Data**: Plain text emails for Better Auth compatibility
+2. **Financial Identifiers**: Encrypted Tink user IDs and bank account information
+3. **Transaction Data**: Encrypted counterparty account numbers
+4. **OAuth Tokens**: Encrypted access tokens and refresh tokens
 
 ### Why This Approach?
 
-- **Authentication Requirements**: Better Auth requires a plain email field for user authentication and email-based operations
-- **Data Protection**: Sensitive user data is still encrypted and can be used for display purposes
-- **Backward Compatibility**: Existing authentication flows continue to work
-- **Compliance**: Meets data protection requirements while maintaining functionality
+- **Authentication Requirements**: Better Auth requires plain text email fields for user authentication
+- **Data Protection**: Sensitive financial data is encrypted at rest
+- **Performance**: Selective encryption minimizes overhead
+- **Compliance**: Meets data protection requirements for financial applications
 
 ## Implementation
 
 ### User Registration Flow
 
 1. User submits registration form with email/password
-2. Better Auth `create.before` hook triggers:
-   - Encrypts the user's email using AES-256-GCM
-   - Stores encrypted email data in dedicated fields
-   - Processes firstName/lastName from the name field
-3. User is created with both plain and encrypted email
+2. Better Auth processes authentication data normally
+3. Encryption service handles sensitive financial data (Tink user IDs, tokens)
+4. Database stores both plain text (for auth) and encrypted data (for security)
 
 ### Data Access
 
@@ -38,8 +38,8 @@ For user email addresses, we use a dual storage approach:
 ```typescript
 import { userEncryptionService } from "../services/userEncryptionService";
 
-// Get decrypted email for display
-const decryptedEmail = userEncryptionService.decryptUserEmail(user);
+// Get decrypted Tink user ID for API calls
+const decryptedTinkUserId = userEncryptionService.decryptTinkUserId(user);
 
 // Prepare user data for frontend (removes encryption fields)
 const frontendUser = userEncryptionService.prepareUserForFrontend(user);
@@ -47,26 +47,42 @@ const frontendUser = userEncryptionService.prepareUserForFrontend(user);
 
 #### Frontend Display
 
-- Always use the decrypted email from the backend
-- The frontend never sees encryption fields directly
+- Frontend receives decrypted data from backend APIs
+- No encryption fields are exposed to frontend
+- All sensitive data is handled securely in backend services
 
 ## Environment Variables
 
 Required environment variables for encryption:
 
-````bash
+```bash
 # Strong encryption password - generate securely
 ENCRYPTION_MASTER_PASSWORD=<generate-with-openssl-rand-base64-32>
 
 # 32-byte hex salt - generate with: openssl rand -hex 32
 ENCRYPTION_KEY_SALT=<generate-with-openssl-rand-hex-32>
+```
 
 ## Database Schema
 
 ### Encrypted Fields
-- `encryptedEmail` / `encryptedEmailIv` / `encryptedEmailAuthTag` - Email encryption
+
+#### User Table
 - `encryptedTinkUserId` / `encryptedTinkUserIdIv` / `encryptedTinkUserIdAuthTag` - Tink user ID encryption
 - `encryptionKeyId` - Key used for encryption (supports key rotation)
+
+#### Account Table
+- `encryptedAccessToken` / `encryptedAccessTokenIv` / `encryptedAccessTokenAuthTag` - OAuth tokens
+- `encryptedRefreshToken` / `encryptedRefreshTokenIv` / `encryptedRefreshTokenAuthTag` - Refresh tokens
+- `encryptedPassword` / `encryptedPasswordIv` / `encryptedPasswordAuthTag` - Password encryption
+
+#### Bank Account Table
+- `encryptedIban` / `encryptedIbanIv` / `encryptedIbanAuthTag` - IBAN encryption
+- `encryptedAccessToken` / `encryptedAccessTokenIv` / `encryptedAccessTokenAuthTag` - Bank API tokens
+
+#### Transaction Table
+- `encryptedPayeeAccountNumber` / `encryptedPayeeAccountNumberIv` / `encryptedPayeeAccountNumberAuthTag` - Payee accounts
+- `encryptedPayerAccountNumber` / `encryptedPayerAccountNumberIv` / `encryptedPayerAccountNumberAuthTag` - Payer accounts
 
 ### Security Properties
 
@@ -81,24 +97,20 @@ ENCRYPTION_KEY_SALT=<generate-with-openssl-rand-hex-32>
 
 1. **Always use decrypted data for display**:
    ```typescript
-   // ❌ Don't use plain email for display
-   const email = user.email;
-
-   // ✅ Use decrypted email for display
-const email = userEncryptionService.decryptUserEmail(user);
+   // ✅ Use decrypted Tink user ID for API calls
+   const tinkUserId = await userEncryptionService.decryptTinkUserId(user);
+   ```
 
 2. **Use the encryption service for new sensitive fields**:
-
    ```typescript
-   const encryptedData = encryptionService.encrypt(sensitiveValue);
+   const encryptedData = await encryptionService.encrypt(sensitiveValue);
    const fields = encryptionResultToFields(encryptedData);
    ```
 
 3. **Never log or expose encrypted data**:
-
    ```typescript
    // ❌ Don't log encrypted fields
-   console.log(user.encryptedEmail);
+   console.log(user.encryptedTinkUserId);
 
    // ✅ Log only non-sensitive data
    console.log(`User ${user.id} updated`);
@@ -115,8 +127,9 @@ const email = userEncryptionService.decryptUserEmail(user);
 
 The encryption system includes comprehensive tests covering:
 
-- Email encryption/decryption
 - Tink user ID encryption/decryption
+- Bank account data encryption/decryption
+- Transaction data encryption/decryption
 - Frontend data preparation
 - Error handling and fallbacks
 
@@ -132,4 +145,14 @@ npm run test:run -- __tests__/unit/services/userEncryptionService.test.ts
 2. **Database-Level Encryption**: Consider column-level encryption for additional security
 3. **Key Management Service**: Integrate with AWS KMS or similar for enterprise deployments
 4. **Audit Logging**: Track access to decrypted sensitive data
-````
+
+## Compliance Benefits
+
+This encryption approach helps meet requirements for:
+
+- **PCI DSS**: Protects payment card data
+- **GDPR**: Enhances personal data protection
+- **PSD2**: Meets financial data security requirements
+- **SOC 2**: Implements required security controls
+
+The system provides enterprise-grade security for sensitive financial data while maintaining application performance and compliance with industry standards.

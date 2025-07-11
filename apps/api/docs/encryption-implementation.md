@@ -57,7 +57,6 @@ encryptionService.setActiveKey("key_2024_01");
 
 ### User Table
 
-- `email` → `encrypted_email`, `encrypted_email_iv`, `encrypted_email_auth_tag`
 - `tinkUserId` → `encrypted_tink_user_id`, `encrypted_tink_user_id_iv`, `encrypted_tink_user_id_auth_tag`
 
 ### Account Table

@@ -9,44 +9,6 @@ export class UserEncryptionService {
   private encryptionService = getEncryptionService();
 
   /**
-   * Decrypt user's email from encrypted fields
-   */
-  async decryptUserEmail(user: User): Promise<string | null> {
-    if (
-      !user.encryptedEmail ||
-      !user.encryptedEmailIv ||
-      !user.encryptedEmailAuthTag ||
-      !user.encryptionKeyId
-    ) {
-      return null;
-    }
-
-    try {
-      const encryptedData = encryptedFieldToResult({
-        encryptedData: user.encryptedEmail,
-        iv: user.encryptedEmailIv,
-        authTag: user.encryptedEmailAuthTag,
-        keyId: user.encryptionKeyId,
-      });
-
-      if (!encryptedData) {
-        console.error(`🔓 Failed to create encrypted data object`);
-        return null;
-      }
-
-      console.log(`🔓 Calling encryption service decrypt...`);
-      const decryptedEmail = await this.encryptionService.decrypt(
-        encryptedData as DecryptionInput
-      );
-      console.log(`🔓 Successfully decrypted email: ${decryptedEmail}`);
-      return decryptedEmail;
-    } catch (error) {
-      console.error(`🔓 Failed to decrypt email for user ${user.id}:`, error);
-      return null;
-    }
-  }
-
-  /**
    * Decrypt user's Tink user ID from encrypted fields
    */
   async decryptTinkUserId(user: User): Promise<string | null> {
@@ -92,16 +54,12 @@ export class UserEncryptionService {
   ): Promise<
     Omit<
       User,
-      | "encryptedEmail"
-      | "encryptedEmailIv"
-      | "encryptedEmailAuthTag"
       | "encryptedTinkUserId"
       | "encryptedTinkUserIdIv"
       | "encryptedTinkUserIdAuthTag"
       | "encryptionKeyId"
     >
   > {
-    const decryptedEmail = await this.decryptUserEmail(user);
     const decryptedTinkUserId = await this.decryptTinkUserId(user);
 
     // Create a new object without encryption fields
@@ -110,7 +68,7 @@ export class UserEncryptionService {
       name: user.name,
       firstName: user.firstName,
       lastName: user.lastName,
-      email: decryptedEmail || "Email unavailable", // Don't show hash, show meaningful message
+      email: user.email,
       emailVerified: user.emailVerified,
       image: user.image,
       role: user.role,

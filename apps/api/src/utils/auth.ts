@@ -2,29 +2,10 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createDatabase } from "../../db/db";
 import * as schema from "../../db/schema";
-import { getEncryptionService } from "../services/encryptionService";
-import { encryptionResultToFields } from "../types/encryption";
-import { createHash } from "crypto";
-import { eq } from "drizzle-orm";
 
 // Create a dedicated database instance for Better Auth
 const { db } = createDatabase();
 
-/**
- * Hash an email address for storage while maintaining uniqueness
- * This allows us to check for duplicate emails without storing them in plain text
- */
-function hashEmail(email: string): string {
-  const normalizedEmail = email.toLowerCase().trim();
-  const secret = process.env.BETTER_AUTH_SECRET;
-  if (!secret) {
-    throw new Error("BETTER_AUTH_SECRET environment variable is required");
-  }
-  return createHash("sha256")
-    .update(normalizedEmail)
-    .update(secret)
-    .digest("hex");
-}
 
 /**
  * Utility function to split a full name into firstName and lastName with fallbacks
@@ -82,17 +63,6 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    async getUserByEmail(email: string) {
-      // Hash the incoming email to find the user
-      const hashedEmail = hashEmail(email);
-      const users = await db
-        .select()
-        .from(schema.user)
-        .where(eq(schema.user.email, hashedEmail))
-        .limit(1);
-
-      return users[0] || null;
-    },
   },
   user: {
     additionalFields: {
@@ -109,27 +79,6 @@ export const auth = betterAuth({
         defaultValue: "user",
         input: false, // Don't allow user to set role
       },
-      // Encrypted email fields
-      encryptedEmail: {
-        type: "string",
-        required: false,
-        input: false, // Don't allow user to set these directly
-      },
-      encryptedEmailIv: {
-        type: "string",
-        required: false,
-        input: false,
-      },
-      encryptedEmailAuthTag: {
-        type: "string",
-        required: false,
-        input: false,
-      },
-      encryptionKeyId: {
-        type: "string",
-        required: false,
-        input: false,
-      },
       // Encrypted Tink user ID fields
       encryptedTinkUserId: {
         type: "string",
@@ -142,6 +91,11 @@ export const auth = betterAuth({
         input: false,
       },
       encryptedTinkUserIdAuthTag: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+      encryptionKeyId: {
         type: "string",
         required: false,
         input: false,
@@ -163,106 +117,28 @@ export const auth = betterAuth({
             name: user.name,
           });
 
-          try {
-            // Store the original email for encryption
-            const originalEmail = user.email;
-            console.log("📧 Original email for encryption:", originalEmail);
+          // Use the utility function for consistent name handling
+          const { firstName, lastName } = splitNameWithFallbacks(
+            user.name,
+            user.email
+          );
+          console.log("👤 Name split result:", { firstName, lastName });
 
-            // Use the utility function for consistent name handling
-            const { firstName, lastName } = splitNameWithFallbacks(
-              user.name,
-              originalEmail
-            );
-            console.log("👤 Name split result:", { firstName, lastName });
+          const finalUserData = {
+            ...user,
+            firstName,
+            lastName,
+          };
 
-            // Check environment variables
-            console.log("🔑 Environment variables check:");
-            console.log(
-              "  ENCRYPTION_MASTER_PASSWORD:",
-              process.env.ENCRYPTION_MASTER_PASSWORD ? "SET" : "NOT SET"
-            );
-            console.log(
-              "  ENCRYPTION_KEY_SALT:",
-              process.env.ENCRYPTION_KEY_SALT ? "SET" : "NOT SET"
-            );
+          console.log(
+            "✅ Final user data prepared with fields:",
+            Object.keys(finalUserData)
+          );
+          console.log("🎯 USER CREATION HOOK SUCCESS");
 
-            // Initialize encryption service
-            console.log("🔐 Initializing encryption service...");
-            const encryptionService = getEncryptionService();
-            await encryptionService.waitForInitialization();
-            console.log("✅ Encryption service initialized");
-
-            // Encrypt the email address and hash it for uniqueness
-            let encryptedEmailFields = {};
-            let hashedEmail = user.email;
-
-            if (originalEmail) {
-              console.log("🔐 Encrypting email:", originalEmail);
-              const encryptedEmail = await encryptionService.encrypt(
-                originalEmail
-              );
-              console.log("✅ Email encrypted successfully:", {
-                encryptedData:
-                  encryptedEmail.encryptedData.substring(0, 20) + "...",
-                keyId: encryptedEmail.keyId,
-              });
-
-              const emailFields = encryptionResultToFields(encryptedEmail);
-              encryptedEmailFields = {
-                encryptedEmail: emailFields.encryptedData,
-                encryptedEmailIv: emailFields.iv,
-                encryptedEmailAuthTag: emailFields.authTag,
-                encryptionKeyId: emailFields.keyId,
-              };
-              console.log(
-                "📦 Encrypted email fields prepared:",
-                Object.keys(encryptedEmailFields)
-              );
-
-              // Hash the email for uniqueness constraint (Better Auth requirement)
-              hashedEmail = hashEmail(originalEmail);
-              console.log("🔒 Email hashed for uniqueness");
-            }
-
-            const finalUserData = {
-              ...user,
-              email: hashedEmail, // Store hashed email for Better Auth uniqueness
-              firstName,
-              lastName,
-              ...encryptedEmailFields,
-            };
-
-            console.log(
-              "✅ Final user data prepared with fields:",
-              Object.keys(finalUserData)
-            );
-            console.log("🎯 USER CREATION HOOK SUCCESS");
-
-            return {
-              data: finalUserData,
-            };
-          } catch (error: unknown) {
-            console.error("❌ ERROR in user creation hook:", error);
-            console.error("❌ Error details:", {
-              message: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : "No stack trace",
-            });
-            // Don't throw the error, just log it and continue with basic user creation
-            // This ensures user creation doesn't fail even if encryption fails
-            const { firstName, lastName } = splitNameWithFallbacks(
-              user.name,
-              user.email
-            );
-
-            return {
-              data: {
-                ...user,
-                firstName,
-                lastName,
-                email: hashEmail(user.email),
-              },
-            };
-          }
+          return {
+            data: finalUserData,
+          };
         },
       },
       update: {

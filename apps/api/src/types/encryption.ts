@@ -8,9 +8,6 @@ export interface EncryptedField {
 }
 
 export interface EncryptedUser {
-  encryptedEmail: string | null;
-  encryptedEmailIv: string | null;
-  encryptedEmailAuthTag: string | null;
   encryptedTinkUserId: string | null;
   encryptedTinkUserIdIv: string | null;
   encryptedTinkUserIdAuthTag: string | null;

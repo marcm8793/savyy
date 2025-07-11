@@ -1,82 +1,73 @@
 # Encrypted Data Inventory
 
-This document provides a comprehensive inventory of all encrypted data stored in the Savyy application.
+This document provides a comprehensive inventory of all encrypted data stored in the Savyy application database.
 
-## Encrypted Fields by Database Table
+## Overview
 
-### Users Table (`user`)
-- **Email addresses** (`encryptedEmail`)
-- **Tink User IDs** (`encryptedTinkUserId`)
+The application uses AES-256-GCM encryption to protect sensitive user data. Each encrypted field uses a 4-column storage pattern:
+- `encrypted_*` - Base64-encoded encrypted data
+- `encrypted_*_iv` - Base64-encoded initialization vector
+- `encrypted_*_auth_tag` - Base64-encoded authentication tag
+- `encryption_key_id` - Key identifier for rotation support
 
-### Accounts Table (`account`)
-- **Access tokens** (`encryptedAccessToken`)
-- **Refresh tokens** (`encryptedRefreshToken`)
-- **ID tokens** (`encryptedIdToken`)
-- **Passwords** (`encryptedPassword`)
+## Encrypted Data Types
 
-### Bank Accounts Table (`bank_accounts`)
-- **IBAN numbers** (`encryptedIban`)
-- **Access tokens** (`encryptedAccessToken`)
+### 1. User Data (users table)
 
-### Transactions Table (`transactions`)
-- **Payee account numbers** (`encryptedPayeeAccountNumber`)
-- **Payer account numbers** (`encryptedPayerAccountNumber`)
+#### Tink User ID
+- **Fields**: `encrypted_tink_user_id`, `encrypted_tink_user_id_iv`, `encrypted_tink_user_id_auth_tag`
+- **Purpose**: Secure storage of Tink API user identifiers
+- **Fallback**: Plain text `tink_user_id` field available during migration
 
-## Encryption Infrastructure
+### 2. Account Data (accounts table)
 
-### Algorithm
-- **AES-256-GCM** (Advanced Encryption Standard with Galois/Counter Mode)
-- Provides confidentiality, authenticity, and integrity
+#### OAuth Tokens
+- **Access Token**: `encrypted_access_token`, `encrypted_access_token_iv`, `encrypted_access_token_auth_tag`
+- **Refresh Token**: `encrypted_refresh_token`, `encrypted_refresh_token_iv`, `encrypted_refresh_token_auth_tag`
+- **ID Token**: `encrypted_id_token`, `encrypted_id_token_iv`, `encrypted_id_token_auth_tag`
+- **Purpose**: Secure storage of OAuth authentication tokens
 
-### Key Management
-- **Master password**: Stored in `ENCRYPTION_MASTER_PASSWORD` environment variable
-- **Key derivation salt**: Stored in `ENCRYPTION_KEY_SALT` environment variable
-- **Key rotation**: Supported through `encryptionKeyId` field in each table
+#### Password Storage
+- **Fields**: `encrypted_password`, `encrypted_password_iv`, `encrypted_password_auth_tag`
+- **Purpose**: Secure storage of user passwords (when applicable)
 
-### Core Services
-- **EncryptionService**: Handles all encryption/decryption operations
-- **UserEncryptionService**: Manages user-specific data encryption/decryption
+### 3. Bank Account Data (bank_accounts table)
 
-## Storage Pattern
+#### IBAN
+- **Fields**: `encrypted_iban`, `encrypted_iban_iv`, `encrypted_iban_auth_tag`
+- **Purpose**: Secure storage of International Bank Account Numbers
+- **Fallback**: Plain text `iban` field available during migration
 
-Each encrypted field uses a 4-column pattern:
-1. `encrypted_[field_name]` - The encrypted data
-2. `encrypted_[field_name]_iv` - Initialization vector (16 bytes)
-3. `encrypted_[field_name]_auth_tag` - Authentication tag
-4. `encryption_key_id` - Key identifier for rotation support
+#### Access Tokens
+- **Fields**: `encrypted_access_token`, `encrypted_access_token_iv`, `encrypted_access_token_auth_tag`
+- **Purpose**: Secure storage of bank-specific API access tokens
 
-## Data Classification
+### 4. Transaction Data (transactions table)
 
-### Highly Sensitive (Financial)
-- IBAN numbers
-- Account numbers (payee/payer)
-- OAuth tokens (access, refresh, ID)
+#### Counterparty Account Numbers
+- **Payee Account**: `encrypted_payee_account_number`, `encrypted_payee_account_number_iv`, `encrypted_payee_account_number_auth_tag`
+- **Payer Account**: `encrypted_payer_account_number`, `encrypted_payer_account_number_iv`, `encrypted_payer_account_number_auth_tag`
+- **Purpose**: Secure storage of account numbers in transaction records
 
-### Personally Identifiable Information (PII)
-- Email addresses
-- Tink User IDs
+## Key Management
 
-### Authentication Data
-- Account passwords
-- Access tokens
+- **Master Key**: Derived from `ENCRYPTION_MASTER_PASSWORD` environment variable
+- **Salt**: Stored in `ENCRYPTION_KEY_SALT` environment variable
+- **Key Rotation**: Supported via `encryption_key_id` field
+- **Algorithm**: AES-256-GCM with 96-bit IV and 128-bit authentication tag
 
-## Security Features
+## Security Considerations
 
-- **Authenticated encryption**: Prevents data tampering
-- **Unique IVs**: Each encryption operation uses a random initialization vector
-- **Key rotation**: Multiple encryption keys can coexist
-- **Secure key derivation**: Uses scrypt for password-based key derivation
-
-## Migration Strategy
-
-The system supports dual storage during migration:
-- Both encrypted and plain-text fields exist during transition
-- New data is encrypted while old data remains accessible
-- Services handle both encrypted and plain-text data for backward compatibility
+1. **At Rest**: All sensitive data encrypted before database storage
+2. **In Transit**: Data decrypted only when needed for API responses
+3. **Key Management**: Master key stored in environment variables
+4. **Rotation**: Key rotation supported without data migration
+5. **Fallback**: Plain text fields available during transition periods
 
 ## Compliance
 
-This encryption implementation is designed to meet:
-- **PCI DSS** requirements for payment card data
-- **GDPR** requirements for personal data protection
-- **Financial industry** compliance standards
+This encryption approach helps meet requirements for:
+- PCI DSS (payment card data)
+- GDPR (personal data protection)
+- PSD2 (financial data security)
+- SOC 2 (security controls)

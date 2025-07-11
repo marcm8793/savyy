@@ -6,9 +6,6 @@ import { User } from "../../../db/schema";
 vi.mock("../../../src/services/encryptionService", () => ({
   getEncryptionService: () => ({
     decrypt: vi.fn(async (data) => {
-      if (data.encryptedData === "encrypted_email") {
-        return "decrypted@example.com";
-      }
       if (data.encryptedData === "encrypted_tink_id") {
         return "decrypted_tink_123";
       }
@@ -29,14 +26,11 @@ describe("UserEncryptionService", () => {
       name: "John Doe",
       firstName: "John",
       lastName: "Doe",
-      email: "original@example.com",
+      email: "test@example.com",
       emailVerified: true,
       image: null,
       role: "user",
       tinkUserId: "original_tink_123",
-      encryptedEmail: "encrypted_email",
-      encryptedEmailIv: "email_iv",
-      encryptedEmailAuthTag: "email_auth_tag",
       encryptedTinkUserId: "encrypted_tink_id",
       encryptedTinkUserIdIv: "tink_iv",
       encryptedTinkUserIdAuthTag: "tink_auth_tag",
@@ -46,27 +40,6 @@ describe("UserEncryptionService", () => {
     } as User;
   });
 
-  describe("decryptUserEmail", () => {
-    it("should decrypt email when encrypted fields are present", async () => {
-      const result = await userEncryptionService.decryptUserEmail(mockUser);
-      expect(result).toBe("decrypted@example.com");
-    });
-
-    it("should return null when encrypted fields are missing", async () => {
-      const userWithoutEncryption = {
-        ...mockUser,
-        encryptedEmail: null,
-        encryptedEmailIv: null,
-        encryptedEmailAuthTag: null,
-        encryptionKeyId: null,
-      };
-
-      const result = await userEncryptionService.decryptUserEmail(
-        userWithoutEncryption
-      );
-      expect(result).toBe(null);
-    });
-  });
 
   describe("decryptTinkUserId", () => {
     it("should decrypt Tink user ID when encrypted fields are present", async () => {
@@ -101,7 +74,7 @@ describe("UserEncryptionService", () => {
         name: "John Doe",
         firstName: "John",
         lastName: "Doe",
-        email: "decrypted@example.com",
+        email: "test@example.com",
         emailVerified: true,
         image: null,
         role: "user",
@@ -111,9 +84,9 @@ describe("UserEncryptionService", () => {
       });
 
       // Ensure encryption fields are not present
-      expect(result).not.toHaveProperty("encryptedEmail");
-      expect(result).not.toHaveProperty("encryptedEmailIv");
-      expect(result).not.toHaveProperty("encryptedEmailAuthTag");
+      expect(result).not.toHaveProperty("encryptedTinkUserId");
+      expect(result).not.toHaveProperty("encryptedTinkUserIdIv");
+      expect(result).not.toHaveProperty("encryptedTinkUserIdAuthTag");
       expect(result).not.toHaveProperty("encryptionKeyId");
     });
   });

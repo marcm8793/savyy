@@ -44,7 +44,7 @@ export function AuthDebug() {
 
       {/* Better Auth Session */}
       <div>
-        <h3 className="font-semibold">Better Auth Session (Hashed Email):</h3>
+        <h3 className="font-semibold">Better Auth Session:</h3>
         <div className="bg-white p-3 rounded text-sm dark:bg-gray-700">
           <p>
             <strong>Loading:</strong> {sessionLoading ? "Yes" : "No"}
@@ -62,8 +62,8 @@ export function AuthDebug() {
                 <strong>User ID:</strong> {session.user?.id}
               </p>
               <p>
-                <strong>Email (HASHED):</strong>{" "}
-                <span className="text-red-600 font-mono text-xs">
+                <strong>Email:</strong>{" "}
+                <span className="text-blue-600 font-mono text-xs">
                   {session.user?.email}
                 </span>
               </p>
@@ -75,9 +75,9 @@ export function AuthDebug() {
         </div>
       </div>
 
-      {/* Decrypted User Data */}
+      {/* User Data via tRPC */}
       <div>
-        <h3 className="font-semibold">Decrypted User Data (Real Email):</h3>
+        <h3 className="font-semibold">User Data via tRPC:</h3>
         <div className="bg-green-50 p-3 rounded text-sm dark:bg-gray-700">
           <p>
             <strong>Loading:</strong> {decryptedLoading ? "Yes" : "No"}
@@ -94,7 +94,7 @@ export function AuthDebug() {
                 <strong>User ID:</strong> {decryptedUser.id}
               </p>
               <p>
-                <strong>Email (DECRYPTED):</strong>{" "}
+                <strong>Email:</strong>{" "}
                 <span className="text-green-600 font-semibold">
                   {decryptedUser.email}
                 </span>

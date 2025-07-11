@@ -7,6 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatSimpleAmount } from "@/lib/utils";
+import { useLocaleContext } from "@/providers/locale-provider";
 
 interface CategoryData {
   count: number;
@@ -22,6 +24,7 @@ export function CategoryBreakdown({
   categoryBreakdown,
   totalExpenses,
 }: CategoryBreakdownProps) {
+  const { locale } = useLocaleContext();
   return (
     <Card>
       <CardHeader>
@@ -43,7 +46,7 @@ export function CategoryBreakdown({
                 </div>
                 <div className="text-right">
                   <div className="font-medium">
-                    €{Math.abs(data.amount).toLocaleString()}
+                    {formatSimpleAmount(Math.abs(data.amount), "EUR", locale)}
                   </div>
                   <div className="h-2 w-24 bg-muted rounded-full overflow-hidden">
                     <div

@@ -57,6 +57,8 @@ import { ModeToggle } from "@/components/themes/mode-toggle";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { CategoryCombobox } from "@/components/transactions/category-combobox";
 import { TransactionDetailSheet } from "@/components/transactions/transaction-detail-sheet";
+import { formatAmount, formatSimpleAmount } from "@/lib/utils";
+import { useLocaleContext } from "@/providers/locale-provider";
 
 // Use the transaction type but with serialized dates (as they come from tRPC)
 type Transaction = {
@@ -96,6 +98,7 @@ type Transaction = {
 };
 
 export default function TransactionsPage() {
+  const { locale } = useLocaleContext();
   const [selectedMonth, setSelectedMonth] = useState<string>(
     format(new Date(), "yyyy-MM")
   );
@@ -159,20 +162,6 @@ export default function TransactionsPage() {
     return options;
   }, []);
 
-  // Format amount helper
-  const formatAmount = (
-    amount: string,
-    scale: number | null,
-    currency: string,
-    defaultCurrency = "EUR" // TODO: or get from user config
-  ) => {
-    const numAmount = parseFloat(amount);
-    const scaledAmount = numAmount / Math.pow(10, scale || 0);
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || defaultCurrency,
-    }).format(scaledAmount);
-  };
 
   // Get account name helper
   const getAccountName = (tinkAccountId: string) => {
@@ -361,10 +350,7 @@ export default function TransactionsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                    {new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "EUR",
-                    }).format(stats.totalIncome)}
+                    {formatSimpleAmount(stats.totalIncome, "EUR", locale)}
                   </div>
                 </CardContent>
               </Card>
@@ -378,10 +364,7 @@ export default function TransactionsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">
-                    {new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "EUR",
-                    }).format(stats.totalExpenses)}
+                    {formatSimpleAmount(stats.totalExpenses, "EUR", locale)}
                   </div>
                 </CardContent>
               </Card>
@@ -399,10 +382,7 @@ export default function TransactionsPage() {
                       stats.netAmount >= 0 ? "text-green-600" : "text-red-600"
                     }`}
                   >
-                    {new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "EUR",
-                    }).format(stats.netAmount)}
+                    {formatSimpleAmount(stats.netAmount, "EUR", locale)}
                   </div>
                 </CardContent>
               </Card>
@@ -580,7 +560,8 @@ export default function TransactionsPage() {
                                       {formatAmount(
                                         transaction.amount,
                                         transaction.amountScale,
-                                        transaction.currencyCode
+                                        transaction.currencyCode,
+                                        locale
                                       )}
                                     </div>
                                   </TableCell>

@@ -11,6 +11,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CategoryCombobox } from "./category-combobox";
 import { format, parseISO } from "date-fns";
+import { formatAmount, calculateScaledAmount } from "@/lib/utils";
+import { useLocaleContext } from "@/providers/locale-provider";
 import {
   Building,
   Calendar,
@@ -56,20 +58,11 @@ export function TransactionDetailSheet({
   onCategoryChange,
   getAccountName,
 }: TransactionDetailSheetProps) {
+  const { locale } = useLocaleContext();
   if (!transaction) return null;
 
-  const amount = parseFloat(transaction.amount);
-  const scaledAmount = amount / Math.pow(10, transaction.amountScale || 0);
+  const scaledAmount = calculateScaledAmount(transaction.amount, transaction.amountScale);
   const isIncome = scaledAmount > 0;
-
-  const formatAmount = (amount: string, scale: number | null, currency: string) => {
-    const numAmount = parseFloat(amount);
-    const scaledAmount = numAmount / Math.pow(10, scale || 0);
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || "EUR",
-    }).format(scaledAmount);
-  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -100,7 +93,8 @@ export function TransactionDetailSheet({
                   {formatAmount(
                     transaction.amount,
                     transaction.amountScale,
-                    transaction.currencyCode
+                    transaction.currencyCode,
+                    locale
                   )}
                 </span>
               </div>

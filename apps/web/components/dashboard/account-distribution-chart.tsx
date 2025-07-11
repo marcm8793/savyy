@@ -15,6 +15,8 @@ import {
   ChartLegendContent,
 } from "@/components/ui/chart";
 import { PieChart, Pie, Cell } from "recharts";
+import { formatSimpleAmount } from "@/lib/utils";
+import { useLocaleContext } from "@/providers/locale-provider";
 
 interface AccountDistributionData {
   name: string;
@@ -31,6 +33,7 @@ export function AccountDistributionChart({
   data,
   chartConfig,
 }: AccountDistributionChartProps) {
+  const { locale } = useLocaleContext();
   if (!data || data.length === 0) {
     return (
       <Card>
@@ -76,7 +79,7 @@ export function AccountDistributionChart({
             <ChartTooltip
               content={<ChartTooltipContent />}
               formatter={(value) => [
-                `€${Number(value).toLocaleString()}`,
+                formatSimpleAmount(Number(value), "EUR", locale),
                 "Balance",
               ]}
             />

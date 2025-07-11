@@ -43,8 +43,11 @@ import {
 } from "@/components/ui/breadcrumb";
 import { ModeToggle } from "@/components/themes/mode-toggle";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { formatSimpleAmount, calculateScaledAmount } from "@/lib/utils";
+import { useLocaleContext } from "@/providers/locale-provider";
 
 export default function CategoriesPage() {
+  const { locale } = useLocaleContext();
   const [selectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
 
   // Get date range for selected month
@@ -94,12 +97,6 @@ export default function CategoriesPage() {
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
   }, [stats]);
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "EUR",
-    }).format(Math.abs(amount));
-  };
 
   const getConfidenceColor = (confidence: string | number | null) => {
     if (!confidence) return "text-gray-500";
@@ -287,7 +284,7 @@ export default function CategoriesPage() {
                                   : "text-green-600"
                               }
                             >
-                              {formatAmount(item.amount)}
+                              {formatSimpleAmount(Math.abs(item.amount), "EUR", locale)}
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
@@ -328,9 +325,7 @@ export default function CategoriesPage() {
                     </TableHeader>
                     <TableBody>
                       {transactionsNeedingReview.map((transaction) => {
-                        const amount = parseFloat(transaction.amount);
-                        const scaledAmount =
-                          amount / Math.pow(10, transaction.amountScale || 0);
+                        const scaledAmount = calculateScaledAmount(transaction.amount, transaction.amountScale);
 
                         return (
                           <TableRow key={transaction.id}>
@@ -408,7 +403,7 @@ export default function CategoriesPage() {
                                     : "text-green-600"
                                 }
                               >
-                                {formatAmount(scaledAmount)}
+                                {formatSimpleAmount(Math.abs(scaledAmount), transaction.currencyCode, locale)}
                               </span>
                             </TableCell>
                           </TableRow>

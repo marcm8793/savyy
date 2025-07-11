@@ -8,6 +8,8 @@ import {
   Wallet,
   CreditCard,
 } from "lucide-react";
+import { formatSimpleAmount } from "@/lib/utils";
+import { useLocaleContext } from "@/providers/locale-provider";
 
 interface StatsCardsProps {
   totalWealth: number;
@@ -26,6 +28,7 @@ export function StatsCards({
   accountCount,
   isLoading,
 }: StatsCardsProps) {
+  const { locale } = useLocaleContext();
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Card>
@@ -37,10 +40,7 @@ export function StatsCards({
           <div className="text-2xl font-bold">
             {isLoading
               ? "..."
-              : new Intl.NumberFormat("en-EU", {
-                  style: "currency",
-                  currency: "EUR",
-                }).format(totalWealth)}
+              : formatSimpleAmount(totalWealth, "EUR", locale)}
           </div>
           <p className="text-xs text-muted-foreground">
             <TrendingUp className="inline h-3 w-3 mr-1" />
@@ -58,10 +58,7 @@ export function StatsCards({
           <div className="text-2xl font-bold">
             {isLoading
               ? "..."
-              : new Intl.NumberFormat("en-EU", {
-                  style: "currency",
-                  currency: "EUR",
-                }).format(totalIncome)}
+              : formatSimpleAmount(totalIncome, "EUR", locale)}
           </div>
           <p className="text-xs text-muted-foreground">Last 3 months</p>
         </CardContent>
@@ -76,10 +73,7 @@ export function StatsCards({
           <div className="text-2xl font-bold">
             {isLoading
               ? "..."
-              : new Intl.NumberFormat("en-EU", {
-                  style: "currency",
-                  currency: "EUR",
-                }).format(totalExpenses)}
+              : formatSimpleAmount(totalExpenses, "EUR", locale)}
           </div>
           <p className="text-xs text-muted-foreground">Last 3 months</p>
         </CardContent>
@@ -92,7 +86,7 @@ export function StatsCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {isLoading ? "..." : `€${averageDailySpending.toFixed(0)}`}
+            {isLoading ? "..." : formatSimpleAmount(averageDailySpending, "EUR", locale).replace(/\.\d{2}$/, "")}
           </div>
           <p className="text-xs text-muted-foreground">
             Daily spending average

@@ -7,6 +7,7 @@ import { MonthlySpendingChart } from "./monthly-spending-chart";
 import { AccountDistributionChart } from "./account-distribution-chart";
 import { CategoryBreakdown } from "./category-breakdown";
 import { QuickActions } from "./quick-actions";
+import { calculateScaledAmount } from "@/lib/utils";
 
 export function DashboardContent() {
   const { data: accounts, isLoading: accountsLoading } =
@@ -65,8 +66,7 @@ export function DashboardContent() {
       const date = new Date(transaction.bookedDate);
       const monthKey = `${months[date.getMonth()]} ${date.getFullYear()}`;
       const amount = transaction.amount
-        ? Number(transaction.amount) /
-          Math.pow(10, transaction.amountScale || 0)
+        ? calculateScaledAmount(transaction.amount, transaction.amountScale)
         : 0;
 
       if (amount < 0) {

@@ -13,6 +13,8 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from "recharts";
+import { formatSimpleAmount } from "@/lib/utils";
+import { useLocaleContext } from "@/providers/locale-provider";
 
 interface MonthlySpendingData {
   month: string;
@@ -24,6 +26,7 @@ interface MonthlySpendingChartProps {
 }
 
 export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
+  const { locale } = useLocaleContext();
   const chartConfig = {
     spending: {
       label: "Monthly Spending",
@@ -82,14 +85,14 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
             <YAxis
               fontSize={10}
               tick={{ fontSize: 10 }}
-              tickFormatter={(value) => `€${Number(value).toLocaleString()}`}
+              tickFormatter={(value) => formatSimpleAmount(Number(value), "EUR", locale).replace(/\.\d{2}$/, "")}
               width={60}
               className="text-xs sm:text-sm"
             />
             <ChartTooltip
               content={<ChartTooltipContent />}
               formatter={(value) => [
-                `€${Number(value).toLocaleString()}`,
+                formatSimpleAmount(Number(value), "EUR", locale),
                 "Spending",
               ]}
             />

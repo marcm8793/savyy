@@ -37,9 +37,12 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { ModeToggle } from "@/components/themes/mode-toggle";
+import { formatBalance } from "@/lib/utils";
+import { useLocaleContext } from "@/providers/locale-provider";
 
 export default function AccountsPage() {
   const searchParams = useSearchParams();
+  const { locale, market } = useLocaleContext();
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
   const [refreshingAccounts, setRefreshingAccounts] = useState<Set<string>>(
@@ -207,8 +210,8 @@ export default function AccountsPage() {
     try {
       const result = await getUpdateConsentUrl({
         credentialsId,
-        market: "FR",
-        locale: "en_US",
+        market,
+        locale: locale.replace("-", "_"),
       });
 
       // Validate URL before redirect for security
@@ -302,8 +305,8 @@ export default function AccountsPage() {
 
       // Call the tRPC procedure to get the secure connection URL
       const result = await connectBankAccount({
-        market: "FR",
-        locale: "en_US",
+        market,
+        locale: locale.replace("-", "_"),
       });
 
       // Validate URL before redirect for security
@@ -331,8 +334,8 @@ export default function AccountsPage() {
 
       // Call the specific reconnect procedure for expired sessions
       const result = await reconnectBankAccount({
-        market: "FR",
-        locale: "en_US",
+        market,
+        locale: locale.replace("-", "_"),
       });
 
       // Validate URL before redirect for security
@@ -354,14 +357,6 @@ export default function AccountsPage() {
     }
   };
 
-  const formatBalance = (balance: number | null, currency: string | null) => {
-    if (balance === null) return "N/A";
-    const amount = balance / 100; // Convert from cents
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: currency || "EUR",
-    }).format(amount);
-  };
 
   const formatAccountType = (type: string | null) => {
     if (!type) return "Unknown";
@@ -524,7 +519,7 @@ export default function AccountsPage() {
                             Balance:
                           </span>
                           <span className="font-semibold text-lg">
-                            {formatBalance(account.balance, account.currency)}
+                            {formatBalance(account.balance, account.currency, locale)}
                           </span>
                         </div>
                         {account.tinkAccountId && (

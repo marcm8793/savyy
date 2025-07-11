@@ -39,6 +39,7 @@ import {
 import { ModeToggle } from "@/components/themes/mode-toggle";
 import { formatBalance } from "@/lib/utils";
 import { useLocaleContext } from "@/providers/locale-provider";
+import Link from "next/link";
 
 export default function AccountsPage() {
   const searchParams = useSearchParams();
@@ -81,8 +82,6 @@ export default function AccountsPage() {
       }
     );
 
-  const { mutateAsync: connectBankAccount } =
-    trpc.account.connectBankAccount.useMutation();
 
   const { mutateAsync: reconnectBankAccount } =
     trpc.account.reconnectBankAccount.useMutation();
@@ -299,34 +298,6 @@ export default function AccountsPage() {
   console.log("Is loading:", isLoading);
   console.log("Accounts length:", accounts?.length);
 
-  const handleConnectBank = async () => {
-    try {
-      setIsConnecting(true);
-
-      // Call the tRPC procedure to get the secure connection URL
-      const result = await connectBankAccount({
-        market,
-        locale: locale.replace("-", "_"),
-      });
-
-      // Validate URL before redirect for security
-      const url = new URL(result.url);
-      if (
-        url.hostname !== "link.tink.com" &&
-        !url.hostname.endsWith(".link.tink.com")
-      ) {
-        throw new Error("Invalid Tink URL domain");
-      }
-
-      // Redirect to Tink's connection flow
-      window.location.href = result.url;
-    } catch (error) {
-      console.error("Failed to connect bank account:", error);
-      setConnectionStatus("error");
-    } finally {
-      setIsConnecting(false);
-    }
-  };
 
   const handleReconnectAccount = async () => {
     try {
@@ -432,19 +403,12 @@ export default function AccountsPage() {
                   )}
                 </Button>
               )}
-              <Button onClick={handleConnectBank} disabled={isConnecting}>
-                {isConnecting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Connect Bank Account
-                  </>
-                )}
-              </Button>
+              <Link href="/accounts/connect">
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Connect Bank Account
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -668,19 +632,12 @@ export default function AccountsPage() {
                 <p className="text-muted-foreground mb-6">
                   Connect your bank account to start tracking your finances
                 </p>
-                <Button onClick={handleConnectBank} disabled={isConnecting}>
-                  {isConnecting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Connecting...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Connect Your First Account
-                    </>
-                  )}
-                </Button>
+                <Link href="/accounts/connect">
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Connect Your First Account
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           )}

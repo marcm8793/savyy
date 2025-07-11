@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { LocaleConfig } from "@/lib/hooks/useLocale";
+import { LocaleConfig } from "@/hooks/useLocale";
 
 const LOCALE_STORAGE_KEY = "savyy-locale";
 
@@ -40,19 +40,18 @@ function getMarketFromLocale(locale: string): string {
   if (LOCALE_TO_MARKET[locale]) {
     return LOCALE_TO_MARKET[locale];
   }
-  
+
   // Try matching just the language code
   const languageCode = locale.split("-")[0];
-  const matchingLocale = Object.keys(LOCALE_TO_MARKET).find(
-    (key) => key.startsWith(languageCode + "-")
+  const matchingLocale = Object.keys(LOCALE_TO_MARKET).find((key) =>
+    key.startsWith(languageCode + "-")
   );
-  
+
   if (matchingLocale) {
     return LOCALE_TO_MARKET[matchingLocale];
   }
-  
-  // Default to FR if no match found (as the app was originally built for France)
-  return "FR";
+
+  return "US";
 }
 
 interface LocaleContextValue extends LocaleConfig {
@@ -67,13 +66,13 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") {
       return "en-US";
     }
-    
+
     // Try to get saved preference
     const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
     if (saved) {
       return saved;
     }
-    
+
     // Fall back to browser locale
     return navigator.language || "en-US";
   });
@@ -81,7 +80,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Only run on client-side after hydration
     if (typeof window === "undefined") return;
-    
+
     // Check if we need to update from server-side default
     const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
     if (!saved) {
@@ -91,7 +90,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
         setLocale(browserLocale);
       }
     }
-  }, []);
+  }, [locale]);
 
   const updateLocale = (newLocale: string) => {
     localStorage.setItem(LOCALE_STORAGE_KEY, newLocale);
@@ -107,18 +106,16 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <LocaleContext.Provider value={value}>
-      {children}
-    </LocaleContext.Provider>
+    <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
   );
 }
 
 export function useLocaleContext() {
   const context = useContext(LocaleContext);
-  
+
   if (!context) {
     throw new Error("useLocaleContext must be used within a LocaleProvider");
   }
-  
+
   return context;
 }

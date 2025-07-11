@@ -51,7 +51,7 @@ function getMarketFromLocale(locale: string): string {
     return LOCALE_TO_MARKET[matchingLocale];
   }
 
-  return "US";
+  return "FR";
 }
 
 interface LocaleContextValue extends LocaleConfig {

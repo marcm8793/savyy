@@ -38,49 +38,62 @@ import {
 import { ModeToggle } from "@/components/themes/mode-toggle";
 import { useLocaleContext } from "@/providers/locale-provider";
 import Link from "next/link";
-import { TINK_MARKETS, type TinkMarketCode, type TinkLocale, isTinkLocale } from "@/lib/tink-markets";
-
+import {
+  TINK_MARKETS,
+  type TinkMarketCode,
+  type TinkLocale,
+  isTinkLocale,
+} from "@/lib/tink-markets";
 
 export default function ConnectAccountPage() {
   const { locale, market } = useLocaleContext();
-  
+
   // Get initial market based on user's locale context, fallback to France
   const getInitialMarket = () => {
-    if (market && TINK_MARKETS.find(m => m.code === market)) {
+    if (market && TINK_MARKETS.find((m) => m.code === market)) {
       return market;
     }
     // Try to match based on locale
-    const localeCountry = locale.split('-')[1]?.toUpperCase();
-    if (localeCountry && TINK_MARKETS.find(m => m.code === localeCountry)) {
+    const localeCountry = locale.split("-")[1]?.toUpperCase();
+    if (localeCountry && TINK_MARKETS.find((m) => m.code === localeCountry)) {
       return localeCountry;
     }
     return "FR"; // Default fallback
   };
-  
+
   // Get initial locale based on user's current locale and selected market
   const getInitialLocale = (marketCode: string) => {
-    const marketData = TINK_MARKETS.find(m => m.code === marketCode);
+    const marketData = TINK_MARKETS.find((m) => m.code === marketCode);
     if (!marketData) return "en_US";
-    
+
     // Try to match current locale with market's supported locales
-    const currentLocaleFormatted = locale.replace('-', '_');
-    if (isTinkLocale(currentLocaleFormatted) && (marketData.locales as readonly string[]).includes(currentLocaleFormatted)) {
+    const currentLocaleFormatted = locale.replace("-", "_");
+    if (
+      isTinkLocale(currentLocaleFormatted) &&
+      (marketData.locales as readonly string[]).includes(currentLocaleFormatted)
+    ) {
       return currentLocaleFormatted;
     }
-    
+
     // Try to match language part of locale
-    const languageCode = locale.split('-')[0];
-    const matchingLocale = marketData.locales.find(l => l.startsWith(languageCode));
+    const languageCode = locale.split("-")[0];
+    const matchingLocale = marketData.locales.find((l) =>
+      l.startsWith(languageCode)
+    );
     if (matchingLocale) {
       return matchingLocale;
     }
-    
+
     return marketData.locales[0]; // Use first available locale for the market
   };
-  
+
   const initialMarket = getInitialMarket();
-  const [selectedMarket, setSelectedMarket] = useState<TinkMarketCode>(initialMarket as TinkMarketCode);
-  const [selectedLocale, setSelectedLocale] = useState<TinkLocale>(getInitialLocale(initialMarket) as TinkLocale);
+  const [selectedMarket, setSelectedMarket] = useState<TinkMarketCode>(
+    initialMarket as TinkMarketCode
+  );
+  const [selectedLocale, setSelectedLocale] = useState<TinkLocale>(
+    getInitialLocale(initialMarket) as TinkLocale
+  );
   const [isConnecting, setIsConnecting] = useState(false);
 
   const { mutateAsync: connectBankAccount } =
@@ -128,7 +141,7 @@ export default function ConnectAccountPage() {
       window.location.href = result.url;
     } catch (error) {
       console.error("Failed to connect bank account:", error);
-      // Error handling could be improved with toast notifications
+      // TODO: Error handling could be improved with toast notifications
     } finally {
       setIsConnecting(false);
     }
@@ -203,7 +216,9 @@ export default function ConnectAccountPage() {
                   </label>
                   <Select
                     value={selectedMarket}
-                    onValueChange={(value) => handleMarketChange(value as TinkMarketCode)}
+                    onValueChange={(value) =>
+                      handleMarketChange(value as TinkMarketCode)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select your country" />
@@ -233,7 +248,9 @@ export default function ConnectAccountPage() {
                   </label>
                   <Select
                     value={selectedLocale}
-                    onValueChange={(value) => setSelectedLocale(value as TinkLocale)}
+                    onValueChange={(value) =>
+                      setSelectedLocale(value as TinkLocale)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select language" />

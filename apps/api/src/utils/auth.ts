@@ -6,7 +6,6 @@ import * as schema from "../../db/schema";
 // Create a dedicated database instance for Better Auth
 const { db } = createDatabase();
 
-
 /**
  * Utility function to split a full name into firstName and lastName with fallbacks
  */
@@ -148,9 +147,6 @@ export const auth = betterAuth({
             firstName?: string;
             lastName?: string;
           };
-
-          // For updates, we need to get the original email from encrypted fields
-          // if it's being updated. This is complex, so for now we'll handle name updates only
 
           // Use the utility function for consistent name handling
           const { firstName, lastName } = splitNameWithFallbacks(

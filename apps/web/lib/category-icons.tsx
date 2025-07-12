@@ -26,19 +26,23 @@ export const categoryColors = {
 // Helper function to get icon component from icon name
 export function getCategoryIcon(iconName: string | null, size: number = 24) {
   if (!iconName) {
-    // Return default folder icon if no icon name provided
     return <FolderIcon size={size} />;
   }
 
-  // Directly access the icon from PhosphorIcons namespace
-  const IconComponent = PhosphorIcons[iconName as PhosphorIconName] as Icon;
-  
+  // Type-safe icon lookup
+  const IconComponent =
+    iconName in PhosphorIcons
+      ? (PhosphorIcons[iconName as PhosphorIconName] as Icon)
+      : null;
+
   if (!IconComponent) {
-    // Fallback to folder icon if Phosphor icon not found
-    console.error(`Icon ${iconName} not found in PhosphorIcons`);
+    // Only log in development to avoid production noise
+    if (process.env.NODE_ENV === "development") {
+      console.error(`Icon ${iconName} not found in PhosphorIcons`);
+    }
     return <FolderIcon size={size} />;
   }
-  
+
   return <IconComponent size={size} />;
 }
 

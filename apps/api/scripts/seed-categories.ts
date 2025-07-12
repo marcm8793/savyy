@@ -99,7 +99,7 @@ const mainCategories: MainCategoryDefinition[] = [
     name: "Entertainment",
     description: "Entertainment, leisure, and recreational activities",
     icon: "Trophy",
-    color: "#8B5CF6",
+    color: "#A855F7",
     sortOrder: 11,
   },
   {
@@ -218,6 +218,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Shopping",
     name: "Shopping - Others",
     description: "Other shopping expenses",
+    icon: "ShoppingBag",
     sortOrder: 8,
   },
   {
@@ -261,6 +262,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Food & Dining",
     name: "Food - Others",
     description: "Other food expenses",
+    icon: "ForkKnife",
     sortOrder: 5,
   },
 
@@ -283,6 +285,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Auto & Transport",
     name: "Auto & Transport - Others",
     description: "Other transportation expenses",
+    icon: "Car",
     sortOrder: 3,
   },
   {
@@ -354,6 +357,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Bank",
     name: "Bank - Others",
     description: "Other banking transactions",
+    icon: "Bank",
     sortOrder: 3,
   },
   {
@@ -418,12 +422,14 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Business Services",
     name: "Business expenses",
     description: "General business expenses",
+    icon: "Briefcase",
     sortOrder: 4,
   },
   {
     mainCategoryName: "Business Services",
     name: "Business services - Others",
     description: "Other business services",
+    icon: "Briefcase",
     sortOrder: 5,
   },
   {
@@ -595,6 +601,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Personal care",
     name: "Personal care - Others",
     description: "Other personal care expenses",
+    icon: "PaintBrush",
     sortOrder: 4,
   },
   {
@@ -638,6 +645,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Taxes",
     name: "Taxes - Others",
     description: "Other tax payments",
+    icon: "Receipt",
     sortOrder: 5,
   },
   {
@@ -667,6 +675,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Home",
     name: "Home - Others",
     description: "Other home expenses",
+    icon: "House",
     sortOrder: 3,
   },
   {
@@ -701,6 +710,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Home",
     name: "Misc. utilities",
     description: "Miscellaneous utilities",
+    icon: "Lightning",
     sortOrder: 8,
   },
   {
@@ -846,6 +856,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Health",
     name: "Health - Others",
     description: "Other healthcare expenses",
+    icon: "FirstAid",
     sortOrder: 3,
   },
   {
@@ -882,6 +893,7 @@ const subCategories: SubCategoryDefinition[] = [
     mainCategoryName: "Education & Children",
     name: "Education & Children - Others",
     description: "Other education and children expenses",
+    icon: "GraduationCap",
     sortOrder: 2,
   },
   {
@@ -929,7 +941,7 @@ const subCategories: SubCategoryDefinition[] = [
 ];
 
 async function seedCategories() {
-  const { db } = createDatabase();
+  const { db, pool } = createDatabase();
 
   try {
     console.log("🌱 Starting category seeding...");
@@ -992,6 +1004,8 @@ async function seedCategories() {
   } catch (error) {
     console.error("❌ Error seeding categories:", error);
     throw error;
+  } finally {
+    await pool.end();
   }
 }
 

@@ -33,7 +33,11 @@ export function CategoryDisplay({
           </Badge>
         </div>
         <div className="flex items-center gap-1">
-          <div className={getCategoryColor(mainCategory)}>
+          <div
+            className={`inline-flex items-center justify-center ${getCategoryColor(
+              mainCategory
+            )}`}
+          >
             {getCategoryIcon(subCategoryIcon || null, 12)}
           </div>
           <Badge variant="secondary" className="text-xs">
@@ -58,7 +62,5 @@ export function CategoryDisplay({
     );
   }
 
-  return (
-    <span className="text-muted-foreground text-sm">Uncategorized</span>
-  );
+  return <span className="text-muted-foreground text-sm">Uncategorized</span>;
 }

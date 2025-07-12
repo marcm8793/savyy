@@ -149,7 +149,10 @@ export default function TransactionsPage() {
     dateRange,
   });
 
-  const transactions = useMemo(() => transactionsData?.transactions || [], [transactionsData]);
+  const transactions = useMemo(
+    () => transactionsData?.transactions || [],
+    [transactionsData]
+  );
 
   // Generate month options for the last 2 years
   const monthOptions = useMemo(() => {
@@ -164,7 +167,6 @@ export default function TransactionsPage() {
     }
     return options;
   }, []);
-
 
   // Get account name helper
   const getAccountName = (tinkAccountId: string) => {
@@ -481,10 +483,20 @@ export default function TransactionsPage() {
                                             >
                                               {transaction.mainCategory}
                                             </Badge>
-                                            <span className="text-xs text-muted-foreground">→</span>
+                                            <span className="text-xs text-muted-foreground">
+                                              →
+                                            </span>
                                             <div className="flex items-center gap-1">
-                                              <div className={getCategoryColor(transaction.mainCategory)}>
-                                                {getCategoryIcon(transaction.subCategoryIcon || null, 12)}
+                                              <div
+                                                className={getCategoryColor(
+                                                  transaction.mainCategory
+                                                )}
+                                              >
+                                                {getCategoryIcon(
+                                                  transaction.subCategoryIcon ||
+                                                    null,
+                                                  12
+                                                )}
                                               </div>
                                               <Badge
                                                 variant="outline"
@@ -531,14 +543,13 @@ export default function TransactionsPage() {
                                       currentSubCategory={
                                         transaction.subCategory
                                       }
-                                      currentMainCategoryIcon={
-                                        transaction.mainCategoryIcon
-                                      }
                                       currentSubCategoryIcon={
                                         transaction.subCategoryIcon
                                       }
                                       transactionAmount={transaction.amount}
-                                      transactionAmountScale={transaction.amountScale}
+                                      transactionAmountScale={
+                                        transaction.amountScale
+                                      }
                                       onCategoryChange={() => {
                                         // Refetch data to update the table
                                         refetch();

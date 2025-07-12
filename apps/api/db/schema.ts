@@ -261,17 +261,16 @@ export const transaction = pgTable("transactions", {
     .notNull(),
 });
 
-// Category definitions table - predefined main and subcategories
-export const categoryDefinition = pgTable(
-  "category_definitions",
+// Main categories table
+export const mainCategory = pgTable(
+  "main_categories",
   {
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    mainCategory: varchar("main_category", { length: 100 }).notNull(),
-    subCategory: varchar("sub_category", { length: 100 }).notNull(),
-    description: text("description"), // Description of what belongs in this category
-    icon: varchar("icon", { length: 50 }), // Icon name for UI
+    name: varchar("name", { length: 100 }).notNull().unique(),
+    description: text("description"),
+    icon: varchar("icon", { length: 50 }),
     color: varchar("color", { length: 7 }), // Hex color code for UI
     isActive: boolean("is_active").default(true),
     sortOrder: integer("sort_order").default(0),
@@ -283,8 +282,37 @@ export const categoryDefinition = pgTable(
       .notNull(),
   },
   (table) => [
-    index("idx_category_main").on(table.mainCategory),
-    index("idx_category_sub").on(table.subCategory),
+    index("idx_main_category_name").on(table.name),
+    index("idx_main_category_sort_order").on(table.sortOrder),
+  ]
+);
+
+// Sub categories table
+export const subCategory = pgTable(
+  "sub_categories",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    mainCategoryId: text("main_category_id")
+      .notNull()
+      .references(() => mainCategory.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"), // Description of what belongs in this subcategory
+    icon: varchar("icon", { length: 50 }), // Optional icon for subcategory (inherits color from main category)
+    isActive: boolean("is_active").default(true),
+    sortOrder: integer("sort_order").default(0),
+    createdAt: timestamp("created_at")
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: timestamp("updated_at")
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("idx_sub_category_main_id").on(table.mainCategoryId),
+    index("idx_sub_category_name").on(table.name),
+    index("idx_sub_category_sort_order").on(table.sortOrder),
   ]
 );
 
@@ -414,7 +442,8 @@ export const schema = {
   verification,
   bankAccount,
   transaction,
-  categoryDefinition,
+  mainCategory,
+  subCategory,
   categoryRule,
   userCategoryCorrection,
   mccCategoryMapping,
@@ -439,8 +468,11 @@ export type BankAccountInsert = typeof bankAccount.$inferInsert;
 export type Transaction = typeof transaction.$inferSelect;
 export type TransactionInsert = typeof transaction.$inferInsert;
 
-export type CategoryDefinition = typeof categoryDefinition.$inferSelect;
-export type CategoryDefinitionInsert = typeof categoryDefinition.$inferInsert;
+export type MainCategory = typeof mainCategory.$inferSelect;
+export type MainCategoryInsert = typeof mainCategory.$inferInsert;
+
+export type SubCategory = typeof subCategory.$inferSelect;
+export type SubCategoryInsert = typeof subCategory.$inferInsert;
 
 export type CategoryRule = typeof categoryRule.$inferSelect;
 export type CategoryRuleInsert = typeof categoryRule.$inferInsert;
@@ -471,10 +503,11 @@ export const bankAccountInsertSchema = createInsertSchema(bankAccount);
 export const transactionSelectSchema = createSelectSchema(transaction);
 export const transactionInsertSchema = createInsertSchema(transaction);
 
-export const categoryDefinitionSelectSchema =
-  createSelectSchema(categoryDefinition);
-export const categoryDefinitionInsertSchema =
-  createInsertSchema(categoryDefinition);
+export const mainCategorySelectSchema = createSelectSchema(mainCategory);
+export const mainCategoryInsertSchema = createInsertSchema(mainCategory);
+
+export const subCategorySelectSchema = createSelectSchema(subCategory);
+export const subCategoryInsertSchema = createInsertSchema(subCategory);
 
 export const categoryRuleSelectSchema = createSelectSchema(categoryRule);
 export const categoryRuleInsertSchema = createInsertSchema(categoryRule);

@@ -145,7 +145,7 @@ interface CategoryGridProps {
     mainCategory: string;
     icon: string | null;
     color: string | null;
-    subCategories: Array<{ id: string; subCategory: string }>;
+    subCategories: Array<{ id: string; subCategory: string; icon: string | null; color: string | null }>;
   }>;
   onCategorySelect: (mainCategory: string) => void;
 }
@@ -179,7 +179,7 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
 
 interface SubcategoryListProps {
   mainCategory: string;
-  subcategories: Array<{ id: string; subCategory: string }>;
+  subcategories: Array<{ id: string; subCategory: string; icon: string | null; color: string | null }>;
   onSubcategorySelect: (mainCategory: string, subCategory: string) => void;
   isLoading: boolean;
 }
@@ -203,6 +203,10 @@ function SubcategoryList({
           <div className="flex items-center space-x-3">
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
+            ) : subcategory.icon ? (
+              <div className={subcategory.color || "text-muted-foreground"}>
+                {getCategoryIcon(subcategory.icon, 16)}
+              </div>
             ) : (
               <div className="w-2 h-2 rounded-full bg-muted-foreground" />
             )}

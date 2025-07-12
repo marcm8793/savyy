@@ -1,205 +1,9 @@
-import {
-  CreditCard,
-  Television,
-  Phone,
-  WifiHigh,
-  DeviceMobile,
-  Gift,
-  Cpu,
-  Book,
-  TShirt,
-  Key,
-  FilmSlate,
-  MusicNote,
-  ShoppingBag,
-  Barbell,
-  ShoppingCart,
-  ForkKnife,
-  Coffee,
-  Lightning,
-  Car,
-  PaintBucket,
-  Wrench,
-  GasPump,
-  Bicycle,
-  Airplane,
-  Bank,
-  Money,
-  Receipt,
-  Coins,
-  Calculator,
-  ChartBar,
-  Briefcase,
-  User,
-  UserCircle,
-  Envelope,
-  Globe,
-  CloudArrowUp,
-  Database,
-  Share,
-  Headphones,
-  Microphone,
-  VideoCamera,
-  Image,
-  File,
-  Folder,
-  Archive,
-  Trash,
-  Clock,
-  Calendar,
-  MapPin,
-  Heart,
-  Star,
-  Flag,
-  Tag,
-  Bookmark,
-  PaintBrush,
-  Scissors,
-  FirstAid,
-  Pill,
-  Thermometer,
-  Stethoscope,
-  House,
-  Bed,
-  Chair,
-  Lamp,
-  Plant,
-  Hammer,
-  Palette,
-  GameController,
-  Ticket,
-  Confetti,
-  Martini,
-  Popcorn,
-  Guitar,
-  Microphone as MicrophoneIcon,
-  PaperPlane,
-  CurrencyDollar,
-  Wallet,
-  HandCoins,
-  Student,
-  GraduationCap,
-  Baby,
-  Rocket,
-  PuzzlePiece,
-  Football,
-  Basketball,
-} from "@phosphor-icons/react";
+import * as PhosphorIcons from "@phosphor-icons/react";
+import type { Icon } from "@phosphor-icons/react";
 import { FolderIcon } from "lucide-react";
 
-// Icon mapping for category icons
-export const categoryIconMap = {
-  // Bills & Utilities
-  CreditCard,
-  Television,
-  Phone,
-  WifiHigh,
-  DeviceMobile,
-
-  // Shopping
-  Gift,
-  Cpu,
-  Book,
-  TShirt,
-  Key,
-  FilmSlate,
-  MusicNote,
-  ShoppingBag,
-  Barbell,
-  ShoppingCart,
-
-  // Food & Dining
-  ForkKnife,
-  Coffee,
-  Lightning,
-
-  // Auto & Transport
-  Car,
-  PaintBucket,
-  Wrench,
-  GasPump,
-  Bicycle,
-  Airplane,
-
-  // Bank
-  Bank,
-  Money,
-  Receipt,
-  Coins,
-  Calculator,
-  ChartBar,
-
-  // Business Services
-  Briefcase,
-  User,
-  UserCircle,
-  Envelope,
-  Globe,
-  CloudArrowUp,
-  Database,
-  Share,
-  Headphones,
-  Microphone,
-  VideoCamera,
-  Image,
-  File,
-  Folder,
-  Archive,
-  Trash,
-  Clock,
-  Calendar,
-  MapPin,
-
-  // Misc. expenses
-  Heart,
-  Star,
-  Flag,
-  Tag,
-  Bookmark,
-
-  // Personal care
-  PaintBrush,
-  Scissors,
-
-  // Health
-  FirstAid,
-  Pill,
-  Thermometer,
-  Stethoscope,
-
-  // Home
-  House,
-  Bed,
-  Chair,
-  Lamp,
-  Plant,
-  Hammer,
-  Palette,
-
-  // Entertainment
-  GameController,
-  Ticket,
-  Confetti,
-  Martini,
-  Popcorn,
-  Guitar,
-  MicrophoneIcon,
-
-  // Withdrawals, checks & transfer
-  PaperPlane,
-  CurrencyDollar,
-  Wallet,
-  HandCoins,
-
-  // Education & Children
-  Student,
-  GraduationCap,
-  Baby,
-  Rocket,
-  PuzzlePiece,
-  Football,
-  Basketball,
-};
+// Valid Phosphor icon names that can be used for categories
+type PhosphorIconName = keyof typeof PhosphorIcons;
 
 // Category color mapping for subtle colors
 export const categoryColors = {
@@ -221,13 +25,20 @@ export const categoryColors = {
 
 // Helper function to get icon component from icon name
 export function getCategoryIcon(iconName: string | null, size: number = 24) {
-  if (!iconName || !(iconName in categoryIconMap)) {
-    // Return default folder icon if icon not found
+  if (!iconName) {
+    // Return default folder icon if no icon name provided
     return <FolderIcon size={size} />;
   }
 
-  const IconComponent =
-    categoryIconMap[iconName as keyof typeof categoryIconMap];
+  // Directly access the icon from PhosphorIcons namespace
+  const IconComponent = PhosphorIcons[iconName as PhosphorIconName] as Icon;
+  
+  if (!IconComponent) {
+    // Fallback to folder icon if Phosphor icon not found
+    console.error(`Icon ${iconName} not found in PhosphorIcons`);
+    return <FolderIcon size={size} />;
+  }
+  
   return <IconComponent size={size} />;
 }
 
@@ -241,5 +52,5 @@ export function getCategoryColor(categoryName: string): string {
 
 // Helper function to check if icon exists
 export function hasIcon(iconName: string | null): boolean {
-  return iconName !== null && iconName in categoryIconMap;
+  return iconName !== null && iconName in PhosphorIcons;
 }

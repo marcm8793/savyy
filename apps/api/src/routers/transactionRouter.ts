@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { eq, and, gte, lte, inArray, desc, sql } from "drizzle-orm";
-import { transaction, bankAccount, categoryDefinition } from "../../db/schema";
+import { transaction, bankAccount, mainCategory, subCategory } from "../../db/schema";
 import { tinkService } from "../services/tinkService";
 import { TinkWebhookService } from "../services/tinkWebhookService";
 import { tokenService } from "../services/tokenService";
@@ -939,18 +939,20 @@ export const transactionRouter = router({
       // Get all categories ordered by mainCategory and subCategory
       const categories = await db
         .select({
-          id: categoryDefinition.id,
-          mainCategory: categoryDefinition.mainCategory,
-          subCategory: categoryDefinition.subCategory,
-          icon: categoryDefinition.icon,
-          color: categoryDefinition.color,
-          sortOrder: categoryDefinition.sortOrder,
+          id: subCategory.id,
+          mainCategory: mainCategory.name,
+          subCategory: subCategory.name,
+          mainCategoryIcon: mainCategory.icon,
+          subCategoryIcon: subCategory.icon,
+          color: mainCategory.color,
+          sortOrder: sql`${mainCategory.sortOrder} * 1000 + ${subCategory.sortOrder}`.as('sortOrder'),
         })
-        .from(categoryDefinition)
+        .from(subCategory)
+        .innerJoin(mainCategory, eq(subCategory.mainCategoryId, mainCategory.id))
+        .where(and(eq(mainCategory.isActive, true), eq(subCategory.isActive, true)))
         .orderBy(
-          categoryDefinition.sortOrder,
-          categoryDefinition.mainCategory,
-          categoryDefinition.subCategory
+          mainCategory.sortOrder,
+          subCategory.sortOrder
         );
 
       // Group categories by main category for easier UI rendering
@@ -958,7 +960,7 @@ export const transactionRouter = router({
         if (!acc[cat.mainCategory]) {
           acc[cat.mainCategory] = {
             mainCategory: cat.mainCategory,
-            icon: cat.icon,
+            icon: cat.mainCategoryIcon,
             color: cat.color,
             subCategories: [],
           };
@@ -966,12 +968,21 @@ export const transactionRouter = router({
         acc[cat.mainCategory].subCategories.push({
           id: cat.id,
           subCategory: cat.subCategory,
+          icon: cat.subCategoryIcon, // Subcategory can have its own icon
+          color: cat.color, // Inherits color from main category
         });
         return acc;
-      }, {} as Record<string, { mainCategory: string; icon: string | null; color: string | null; subCategories: Array<{ id: string; subCategory: string }> }>);
+      }, {} as Record<string, { mainCategory: string; icon: string | null; color: string | null; subCategories: Array<{ id: string; subCategory: string; icon: string | null; color: string | null }> }>);
 
       return {
-        categories,
+        categories: categories.map(cat => ({
+          id: cat.id,
+          mainCategory: cat.mainCategory,
+          subCategory: cat.subCategory,
+          icon: cat.subCategoryIcon || cat.mainCategoryIcon, // Use subcategory icon if available, otherwise main category icon
+          color: cat.color,
+          sortOrder: cat.sortOrder,
+        })),
         grouped: Object.values(grouped),
       };
     } catch (error) {
@@ -1017,12 +1028,17 @@ export const transactionRouter = router({
 
         // Verify the category combination exists
         const [category] = await db
-          .select()
-          .from(categoryDefinition)
+          .select({
+            id: subCategory.id,
+            mainCategory: mainCategory.name,
+            subCategory: subCategory.name,
+          })
+          .from(subCategory)
+          .innerJoin(mainCategory, eq(subCategory.mainCategoryId, mainCategory.id))
           .where(
             and(
-              eq(categoryDefinition.mainCategory, input.mainCategory),
-              eq(categoryDefinition.subCategory, input.subCategory)
+              eq(mainCategory.name, input.mainCategory),
+              eq(subCategory.name, input.subCategory)
             )
           )
           .limit(1);

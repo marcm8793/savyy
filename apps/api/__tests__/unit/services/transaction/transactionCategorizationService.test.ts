@@ -34,10 +34,10 @@ describe("TransactionCategorizationService", () => {
     status: "BOOKED",
   };
 
-  const mockCategoryDefinition = {
+  const mockCategoryJoinResult = {
+    id: "sub-cat-1",
     mainCategory: "Food & Dining",
     subCategory: "Restaurants",
-    isActive: true,
   };
 
   const mockCategoryRule = {
@@ -102,7 +102,7 @@ describe("TransactionCategorizationService", () => {
       // Mock category validation - use mockImplementation to control return values
       mockDb.select.mockImplementation(() => ({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([mockCategoryDefinition]),
+          where: vi.fn().mockResolvedValue([mockCategoryJoinResult]),
         }),
       }));
 
@@ -138,7 +138,7 @@ describe("TransactionCategorizationService", () => {
               return Promise.resolve([]);
             } else {
               // Subsequent calls: return category validation
-              return Promise.resolve([mockCategoryDefinition]);
+              return Promise.resolve([mockCategoryJoinResult]);
             }
           }),
         }),

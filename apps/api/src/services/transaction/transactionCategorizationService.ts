@@ -4,10 +4,10 @@ import {
   schema,
   categoryRule,
   mccCategoryMapping,
-  categoryDefinition,
+  mainCategory as mainCategoryTable,
+  subCategory as subCategoryTable,
   CategoryRule,
   MccCategoryMapping,
-  CategoryDefinition,
 } from "../../../db/schema";
 import { TinkTransaction } from "./types";
 
@@ -175,14 +175,20 @@ export class TransactionCategorizationService {
     }
 
     // Query database to check if category exists
-    const categoryExists: CategoryDefinition[] = await db
-      .select()
-      .from(categoryDefinition)
+    const categoryExists = await db
+      .select({
+        id: subCategoryTable.id,
+        mainCategory: mainCategoryTable.name,
+        subCategory: subCategoryTable.name,
+      })
+      .from(subCategoryTable)
+      .innerJoin(mainCategoryTable, eq(subCategoryTable.mainCategoryId, mainCategoryTable.id))
       .where(
         and(
-          eq(categoryDefinition.mainCategory, mainCategory),
-          eq(categoryDefinition.subCategory, subCategory),
-          eq(categoryDefinition.isActive, true)
+          eq(mainCategoryTable.name, mainCategory),
+          eq(subCategoryTable.name, subCategory),
+          eq(mainCategoryTable.isActive, true),
+          eq(subCategoryTable.isActive, true)
         )
       )
       .limit(1);
@@ -719,9 +725,13 @@ export class TransactionCategorizationService {
       // Load valid category definitions for validation
       if (this.validCategoriesCache.size === 0) {
         const validCategories = await db
-          .select()
-          .from(categoryDefinition)
-          .where(eq(categoryDefinition.isActive, true));
+          .select({
+            mainCategory: mainCategoryTable.name,
+            subCategory: subCategoryTable.name,
+          })
+          .from(subCategoryTable)
+          .innerJoin(mainCategoryTable, eq(subCategoryTable.mainCategoryId, mainCategoryTable.id))
+          .where(and(eq(mainCategoryTable.isActive, true), eq(subCategoryTable.isActive, true)));
 
         this.validCategoriesCache.clear();
         for (const category of validCategories) {

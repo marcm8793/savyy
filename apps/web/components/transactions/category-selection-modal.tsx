@@ -18,6 +18,8 @@ import { getCategoryIcon, getCategoryColor } from "@/lib/category-icons";
 
 interface CategorySelectionModalProps {
   transactionId: string;
+  transactionAmount?: string;
+  transactionAmountScale?: number | null;
   onCategoryChange?: (mainCategory: string, subCategory: string) => void;
   children: React.ReactNode;
 }
@@ -26,12 +28,22 @@ type ViewMode = "main" | "subcategories";
 
 export function CategorySelectionModal({
   transactionId,
+  transactionAmount,
+  transactionAmountScale,
   onCategoryChange,
   children,
 }: CategorySelectionModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<ViewMode>("main");
   const [selectedMainCategory, setSelectedMainCategory] = React.useState<string | null>(null);
+
+  // Calculate if transaction is income (positive amount)
+  const isIncomeTransaction = React.useMemo(() => {
+    if (!transactionAmount) return false;
+    const amount = parseFloat(transactionAmount);
+    const scaledAmount = amount / Math.pow(10, transactionAmountScale || 0);
+    return scaledAmount > 0;
+  }, [transactionAmount, transactionAmountScale]);
 
   // Fetch categories
   const { data: categoriesData, isLoading } = trpc.transaction.getCategories.useQuery();
@@ -53,10 +65,34 @@ export function CategorySelectionModal({
     },
   });
 
+  // Filter categories based on transaction type
+  const filteredCategories = React.useMemo(() => {
+    if (!categoriesData) return [];
+    
+    if (isIncomeTransaction) {
+      // For income transactions, only show Income categories
+      return categoriesData.grouped.filter(group => group.mainCategory === "Income");
+    } else {
+      // For expense transactions, show all categories except Income
+      return categoriesData.grouped.filter(group => group.mainCategory !== "Income");
+    }
+  }, [categoriesData, isIncomeTransaction]);
+
   const handleMainCategorySelect = (mainCategory: string) => {
     setSelectedMainCategory(mainCategory);
     setViewMode("subcategories");
   };
+
+  // For income transactions, automatically select Income and go to subcategories
+  React.useEffect(() => {
+    if (isIncomeTransaction && categoriesData && viewMode === "main") {
+      const incomeCategory = categoriesData.grouped.find(group => group.mainCategory === "Income");
+      if (incomeCategory) {
+        setSelectedMainCategory("Income");
+        setViewMode("subcategories");
+      }
+    }
+  }, [isIncomeTransaction, categoriesData, viewMode]);
 
   const handleSubcategorySelect = (mainCategory: string, subCategory: string) => {
     updateCategoryMutation.mutate({
@@ -80,7 +116,7 @@ export function CategorySelectionModal({
     }
   };
 
-  const selectedGroup = categoriesData?.grouped.find(
+  const selectedGroup = filteredCategories.find(
     (group) => group.mainCategory === selectedMainCategory
   );
 
@@ -109,8 +145,12 @@ export function CategorySelectionModal({
           </div>
           <SheetDescription>
             {viewMode === "main" 
-              ? "Choose a main category for your transaction" 
-              : "Select a subcategory to complete the categorization"
+              ? isIncomeTransaction 
+                ? "Loading income categories..."
+                : "Choose a main category for your transaction"
+              : isIncomeTransaction
+                ? "Select an income subcategory"
+                : "Select a subcategory to complete the categorization"
             }
           </SheetDescription>
         </SheetHeader>
@@ -123,7 +163,7 @@ export function CategorySelectionModal({
             </div>
           ) : viewMode === "main" ? (
             <CategoryGrid
-              categories={categoriesData?.grouped || []}
+              categories={filteredCategories}
               onCategorySelect={handleMainCategorySelect}
             />
           ) : (

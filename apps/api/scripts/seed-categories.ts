@@ -123,6 +123,13 @@ const mainCategories: MainCategoryDefinition[] = [
     color: "#6366F1",
     sortOrder: 14,
   },
+  {
+    name: "Income",
+    description: "Income and earnings",
+    icon: "TrendUp",
+    color: "#22C55E",
+    sortOrder: 15,
+  },
 ];
 
 // Subcategories organized by main category (matching the provided table exactly)
@@ -937,6 +944,113 @@ const subCategories: SubCategoryDefinition[] = [
     description: "Tuition payments",
     icon: "GraduationCap",
     sortOrder: 8,
+  },
+
+  // Income
+  {
+    mainCategoryName: "Income",
+    name: "Deposit",
+    description: "Bank deposits and incoming transfers",
+    icon: "ArrowDown",
+    sortOrder: 1,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Extra incomes",
+    description: "Additional income sources",
+    icon: "Plus",
+    sortOrder: 2,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Grants",
+    description: "Government and institutional grants",
+    icon: "HandCoins",
+    sortOrder: 3,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Interest incomes",
+    description: "Interest from investments and savings",
+    icon: "TrendUp",
+    sortOrder: 4,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Internal transfer",
+    description: "Transfers between own accounts",
+    icon: "ArrowsLeftRight",
+    sortOrder: 5,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Loans",
+    description: "Loan proceeds and disbursements",
+    icon: "HandCoins",
+    sortOrder: 6,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Other incomes",
+    description: "Other miscellaneous income",
+    icon: "DotsThreeOutline",
+    sortOrder: 7,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Pension",
+    description: "Pension and retirement income",
+    icon: "PiggyBank",
+    sortOrder: 8,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Refunds",
+    description: "Refunds and reimbursements",
+    icon: "ArrowCounterClockwise",
+    sortOrder: 9,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Rent",
+    description: "Rental income from properties",
+    icon: "House",
+    sortOrder: 10,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Retirement",
+    description: "Retirement benefits and distributions",
+    icon: "Clock",
+    sortOrder: 11,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Salaries",
+    description: "Salary and wage income",
+    icon: "Money",
+    sortOrder: 12,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Sales",
+    description: "Income from sales of goods or services",
+    icon: "ShoppingBag",
+    sortOrder: 13,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Savings",
+    description: "Transfers from savings accounts",
+    icon: "PiggyBank",
+    sortOrder: 14,
+  },
+  {
+    mainCategoryName: "Income",
+    name: "Services",
+    description: "Income from service provision",
+    icon: "Briefcase",
+    sortOrder: 15,
   },
 ];
 

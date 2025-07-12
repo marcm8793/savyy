@@ -178,6 +178,8 @@ export function TransactionDetailSheet({
               transactionId={transaction.id}
               currentMainCategory={transaction.mainCategory}
               currentSubCategory={transaction.subCategory}
+              transactionAmount={transaction.amount}
+              transactionAmountScale={transaction.amountScale}
               onCategoryChange={() => {
                 if (onCategoryChange) {
                   onCategoryChange();

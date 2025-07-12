@@ -522,6 +522,8 @@ export default function TransactionsPage() {
                                       currentSubCategory={
                                         transaction.subCategory
                                       }
+                                      transactionAmount={transaction.amount}
+                                      transactionAmountScale={transaction.amountScale}
                                       onCategoryChange={() => {
                                         // Refetch data to update the table
                                         refetch();

@@ -21,6 +21,7 @@ export const categoryColors = {
   "Withdrawals, checks & transfer": "text-cyan-500 dark:text-cyan-400",
   Health: "text-teal-500 dark:text-teal-400",
   "Education & Children": "text-indigo-500 dark:text-indigo-400",
+  Income: "text-green-600 dark:text-green-400",
 };
 
 // Helper function to get icon component from icon name

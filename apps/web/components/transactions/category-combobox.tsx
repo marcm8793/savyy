@@ -9,6 +9,8 @@ interface CategoryComboboxProps {
   transactionId: string;
   currentMainCategory?: string | null;
   currentSubCategory?: string | null;
+  transactionAmount?: string;
+  transactionAmountScale?: number | null;
   onCategoryChange?: (mainCategory: string, subCategory: string) => void;
 }
 
@@ -16,11 +18,15 @@ export function CategoryCombobox({
   transactionId,
   currentMainCategory,
   currentSubCategory,
+  transactionAmount,
+  transactionAmountScale,
   onCategoryChange,
 }: CategoryComboboxProps) {
   return (
     <CategorySelectionModal
       transactionId={transactionId}
+      transactionAmount={transactionAmount}
+      transactionAmountScale={transactionAmountScale}
       onCategoryChange={onCategoryChange}
     >
       <Button

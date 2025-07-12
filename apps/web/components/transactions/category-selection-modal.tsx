@@ -157,7 +157,7 @@ export function CategorySelectionModal({
           </div>
           <SheetDescription>
             {viewMode === "main"
-              ? isIncomeTransaction
+              ? isIncomeTransaction && isLoading
                 ? "Loading income categories..."
                 : "Choose a main category for your transaction"
               : isIncomeTransaction
@@ -219,8 +219,7 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
           onClick={() => onCategorySelect(category.mainCategory)}
         >
           <div
-            className={getCategoryColor(category.mainCategory)}
-            style={{ flexShrink: 0 }}
+            className={`${getCategoryColor(category.mainCategory)} shrink-0`}
           >
             {getCategoryIcon(category.icon, 28)}
           </div>
@@ -229,10 +228,7 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
               {category.mainCategory}
             </span>
           </div>
-          <div
-            className="text-xs text-muted-foreground"
-            style={{ flexShrink: 0 }}
-          >
+          <div className="text-xs text-muted-foreground shrink-0">
             {category.subCategories.length} options
           </div>
         </Button>

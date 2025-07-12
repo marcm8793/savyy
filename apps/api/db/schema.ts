@@ -85,9 +85,6 @@ export const account = pgTable("account", {
   encryptedIdToken: text("encrypted_id_token"),
   encryptedIdTokenIv: text("encrypted_id_token_iv"),
   encryptedIdTokenAuthTag: text("encrypted_id_token_auth_tag"),
-  encryptedPassword: text("encrypted_password"),
-  encryptedPasswordIv: text("encrypted_password_iv"),
-  encryptedPasswordAuthTag: text("encrypted_password_auth_tag"),
   encryptionKeyId: text("encryption_key_id"),
 
   // Timestamps

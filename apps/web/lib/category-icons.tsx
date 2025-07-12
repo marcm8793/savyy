@@ -55,6 +55,13 @@ export function getCategoryColor(categoryName: string): string {
   );
 }
 
+// Helper function to convert text color to background color
+export function getCategoryBackgroundColor(categoryName: string): string {
+  const textColor = getCategoryColor(categoryName);
+  // Convert text-{color}-{shade} to bg-{color}-{shade}
+  return textColor.replace(/text-/g, 'bg-');
+}
+
 // Helper function to check if icon exists
 export function hasIcon(iconName: string | null): boolean {
   return iconName !== null && iconName in PhosphorIcons;

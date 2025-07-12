@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { getCategoryIcon, getCategoryColor } from "@/lib/category-icons";
+import { getCategoryIcon, getCategoryColor, getCategoryBackgroundColor } from "@/lib/category-icons";
 
 interface CategorySelectionModalProps {
   transactionId: string;
@@ -140,7 +140,7 @@ export function CategorySelectionModal({
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader className="pb-4">
           <div className="flex items-center justify-between">
-            {viewMode === "subcategories" && (
+            {viewMode === "subcategories" && !isIncomeTransaction && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -261,7 +261,7 @@ function SubcategoryList({
         <Button
           key={subcategory.id}
           variant="ghost"
-          className="w-full justify-start h-auto p-4 text-left"
+          className="w-full justify-start h-auto p-4 text-left hover:bg-muted/50 transition-colors"
           onClick={() =>
             onSubcategorySelect(mainCategory, subcategory.subCategory)
           }
@@ -271,11 +271,11 @@ function SubcategoryList({
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : subcategory.icon ? (
-              <div className={subcategory.color || getCategoryColor(mainCategory)}>
+              <div className={getCategoryColor(mainCategory)}>
                 {getCategoryIcon(subcategory.icon, 16)}
               </div>
             ) : (
-              <div className={`w-2 h-2 rounded-full ${getCategoryColor(mainCategory).replace('text-', 'bg-')}`} />
+              <div className={`w-3 h-3 rounded-full ${getCategoryBackgroundColor(mainCategory)}`} />
             )}
             <span className="text-sm font-medium">
               {subcategory.subCategory}

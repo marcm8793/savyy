@@ -10,6 +10,7 @@ interface CategoryComboboxProps {
   transactionId: string;
   currentMainCategory?: string | null;
   currentSubCategory?: string | null;
+  currentMainCategoryIcon?: string | null;
   currentSubCategoryIcon?: string | null;
   transactionAmount?: string;
   transactionAmountScale?: number | null;

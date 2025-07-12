@@ -24,9 +24,6 @@ export interface EncryptedAccount {
   encryptedIdToken: string | null;
   encryptedIdTokenIv: string | null;
   encryptedIdTokenAuthTag: string | null;
-  encryptedPassword: string | null;
-  encryptedPasswordIv: string | null;
-  encryptedPasswordAuthTag: string | null;
   encryptionKeyId: string | null;
 }
 

@@ -35,7 +35,9 @@ export function CategorySelectionModal({
 }: CategorySelectionModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<ViewMode>("main");
-  const [selectedMainCategory, setSelectedMainCategory] = React.useState<string | null>(null);
+  const [selectedMainCategory, setSelectedMainCategory] = React.useState<
+    string | null
+  >(null);
 
   // Calculate if transaction is income (positive amount)
   const isIncomeTransaction = React.useMemo(() => {
@@ -46,12 +48,15 @@ export function CategorySelectionModal({
   }, [transactionAmount, transactionAmountScale]);
 
   // Fetch categories
-  const { data: categoriesData, isLoading } = trpc.transaction.getCategories.useQuery();
+  const { data: categoriesData, isLoading } =
+    trpc.transaction.getCategories.useQuery();
 
   // Update category mutation
   const updateCategoryMutation = trpc.transaction.updateCategory.useMutation({
     onSuccess: (_, variables) => {
-      toast.success(`Category updated to ${variables.mainCategory} → ${variables.subCategory}`);
+      toast.success(
+        `Category updated to ${variables.mainCategory} → ${variables.subCategory}`
+      );
       setIsOpen(false);
       setViewMode("main");
       setSelectedMainCategory(null);
@@ -68,13 +73,17 @@ export function CategorySelectionModal({
   // Filter categories based on transaction type
   const filteredCategories = React.useMemo(() => {
     if (!categoriesData) return [];
-    
+
     if (isIncomeTransaction) {
       // For income transactions, only show Income categories
-      return categoriesData.grouped.filter(group => group.mainCategory === "Income");
+      return categoriesData.grouped.filter(
+        (group) => group.mainCategory === "Income"
+      );
     } else {
       // For expense transactions, show all categories except Income
-      return categoriesData.grouped.filter(group => group.mainCategory !== "Income");
+      return categoriesData.grouped.filter(
+        (group) => group.mainCategory !== "Income"
+      );
     }
   }, [categoriesData, isIncomeTransaction]);
 
@@ -86,7 +95,9 @@ export function CategorySelectionModal({
   // For income transactions, automatically select Income and go to subcategories
   React.useEffect(() => {
     if (isIncomeTransaction && categoriesData && viewMode === "main") {
-      const incomeCategory = categoriesData.grouped.find(group => group.mainCategory === "Income");
+      const incomeCategory = categoriesData.grouped.find(
+        (group) => group.mainCategory === "Income"
+      );
       if (incomeCategory) {
         setSelectedMainCategory("Income");
         setViewMode("subcategories");
@@ -94,7 +105,10 @@ export function CategorySelectionModal({
     }
   }, [isIncomeTransaction, categoriesData, viewMode]);
 
-  const handleSubcategorySelect = (mainCategory: string, subCategory: string) => {
+  const handleSubcategorySelect = (
+    mainCategory: string,
+    subCategory: string
+  ) => {
     updateCategoryMutation.mutate({
       transactionId,
       mainCategory,
@@ -122,9 +136,7 @@ export function CategorySelectionModal({
 
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
-      <SheetTrigger asChild>
-        {children}
-      </SheetTrigger>
+      <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader className="pb-4">
           <div className="flex items-center justify-between">
@@ -144,14 +156,13 @@ export function CategorySelectionModal({
             <div className="w-8" /> {/* Spacer for centering */}
           </div>
           <SheetDescription>
-            {viewMode === "main" 
-              ? isIncomeTransaction 
+            {viewMode === "main"
+              ? isIncomeTransaction
                 ? "Loading income categories..."
                 : "Choose a main category for your transaction"
               : isIncomeTransaction
-                ? "Select an income subcategory"
-                : "Select a subcategory to complete the categorization"
-            }
+              ? "Select an income subcategory"
+              : "Select a subcategory to complete the categorization"}
           </SheetDescription>
         </SheetHeader>
 
@@ -159,7 +170,9 @@ export function CategorySelectionModal({
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2 text-sm text-muted-foreground">Loading categories...</span>
+              <span className="ml-2 text-sm text-muted-foreground">
+                Loading categories...
+              </span>
             </div>
           ) : viewMode === "main" ? (
             <CategoryGrid
@@ -185,7 +198,12 @@ interface CategoryGridProps {
     mainCategory: string;
     icon: string | null;
     color: string | null;
-    subCategories: Array<{ id: string; subCategory: string; icon: string | null; color: string | null }>;
+    subCategories: Array<{
+      id: string;
+      subCategory: string;
+      icon: string | null;
+      color: string | null;
+    }>;
   }>;
   onCategorySelect: (mainCategory: string) => void;
 }
@@ -200,7 +218,10 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
           className="h-auto flex-col p-3 space-y-2 hover:bg-muted/50 transition-colors min-h-[160px] justify-between w-full whitespace-normal"
           onClick={() => onCategorySelect(category.mainCategory)}
         >
-          <div className={getCategoryColor(category.mainCategory)} style={{ flexShrink: 0 }}>
+          <div
+            className={getCategoryColor(category.mainCategory)}
+            style={{ flexShrink: 0 }}
+          >
             {getCategoryIcon(category.icon, 28)}
           </div>
           <div className="text-sm font-medium text-center leading-snug flex-1 flex items-center justify-center px-2">
@@ -208,7 +229,10 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
               {category.mainCategory}
             </span>
           </div>
-          <div className="text-xs text-muted-foreground" style={{ flexShrink: 0 }}>
+          <div
+            className="text-xs text-muted-foreground"
+            style={{ flexShrink: 0 }}
+          >
             {category.subCategories.length} options
           </div>
         </Button>
@@ -219,7 +243,12 @@ function CategoryGrid({ categories, onCategorySelect }: CategoryGridProps) {
 
 interface SubcategoryListProps {
   mainCategory: string;
-  subcategories: Array<{ id: string; subCategory: string; icon: string | null; color: string | null }>;
+  subcategories: Array<{
+    id: string;
+    subCategory: string;
+    icon: string | null;
+    color: string | null;
+  }>;
   onSubcategorySelect: (mainCategory: string, subCategory: string) => void;
   isLoading: boolean;
 }
@@ -237,7 +266,9 @@ function SubcategoryList({
           key={subcategory.id}
           variant="ghost"
           className="w-full justify-start h-auto p-4 text-left"
-          onClick={() => onSubcategorySelect(mainCategory, subcategory.subCategory)}
+          onClick={() =>
+            onSubcategorySelect(mainCategory, subcategory.subCategory)
+          }
           disabled={isLoading}
         >
           <div className="flex items-center space-x-3">
@@ -250,7 +281,9 @@ function SubcategoryList({
             ) : (
               <div className="w-2 h-2 rounded-full bg-muted-foreground" />
             )}
-            <span className="text-sm font-medium">{subcategory.subCategory}</span>
+            <span className="text-sm font-medium">
+              {subcategory.subCategory}
+            </span>
           </div>
         </Button>
       ))}

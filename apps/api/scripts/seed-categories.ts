@@ -977,7 +977,7 @@ const subCategories: SubCategoryDefinition[] = [
   },
   {
     mainCategoryName: "Income",
-    name: "Internal transfer",
+    name: "Transfer received",
     description: "Transfers between own accounts",
     icon: "ArrowsLeftRight",
     sortOrder: 5,
@@ -998,7 +998,7 @@ const subCategories: SubCategoryDefinition[] = [
   },
   {
     mainCategoryName: "Income",
-    name: "Pension",
+    name: "Pension income",
     description: "Pension and retirement income",
     icon: "PiggyBank",
     sortOrder: 8,
@@ -1012,7 +1012,7 @@ const subCategories: SubCategoryDefinition[] = [
   },
   {
     mainCategoryName: "Income",
-    name: "Rent",
+    name: "Rental income",
     description: "Rental income from properties",
     icon: "House",
     sortOrder: 10,
@@ -1026,7 +1026,7 @@ const subCategories: SubCategoryDefinition[] = [
   },
   {
     mainCategoryName: "Income",
-    name: "Salaries",
+    name: "Salary income",
     description: "Salary and wage income",
     icon: "Money",
     sortOrder: 12,
@@ -1040,7 +1040,7 @@ const subCategories: SubCategoryDefinition[] = [
   },
   {
     mainCategoryName: "Income",
-    name: "Savings",
+    name: "Savings withdrawal",
     description: "Transfers from savings accounts",
     icon: "PiggyBank",
     sortOrder: 14,

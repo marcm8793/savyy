@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
-import { eq, and, gte, lte, inArray, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, desc, sql, getTableColumns } from "drizzle-orm";
 import { transaction, bankAccount, mainCategory, subCategory } from "../../db/schema";
 import { tinkService } from "../services/tinkService";
 import { TinkWebhookService } from "../services/tinkWebhookService";
@@ -228,10 +228,25 @@ export const transactionRouter = router({
           conditions.push(inArray(transaction.status, input.statusIn));
         }
 
-        // Get transactions with pagination
+        // Get transactions with pagination and category icons
         const transactions = await db
-          .select()
+          .select({
+            ...getTableColumns(transaction),
+            mainCategoryIcon: mainCategory.icon,
+            subCategoryIcon: subCategory.icon,
+          })
           .from(transaction)
+          .leftJoin(
+            mainCategory,
+            eq(transaction.mainCategory, mainCategory.name)
+          )
+          .leftJoin(
+            subCategory,
+            and(
+              eq(subCategory.mainCategoryId, mainCategory.id),
+              eq(transaction.subCategory, subCategory.name)
+            )
+          )
           .where(and(...conditions))
           .orderBy(desc(transaction.bookedDate), desc(transaction.createdAt))
           .limit(input.pageSize);

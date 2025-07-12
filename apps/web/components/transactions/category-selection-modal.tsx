@@ -271,11 +271,11 @@ function SubcategoryList({
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : subcategory.icon ? (
-              <div className={subcategory.color || "text-muted-foreground"}>
+              <div className={subcategory.color || getCategoryColor(mainCategory)}>
                 {getCategoryIcon(subcategory.icon, 16)}
               </div>
             ) : (
-              <div className="w-2 h-2 rounded-full bg-muted-foreground" />
+              <div className={`w-2 h-2 rounded-full ${getCategoryColor(mainCategory).replace('text-', 'bg-')}`} />
             )}
             <span className="text-sm font-medium">
               {subcategory.subCategory}

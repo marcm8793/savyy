@@ -37,6 +37,8 @@ interface Transaction {
   status: string;
   mainCategory: string | null;
   subCategory: string | null;
+  mainCategoryIcon: string | null;
+  subCategoryIcon: string | null;
   categoryName: string | null;
   merchantName: string | null;
   reference: string | null;
@@ -178,6 +180,8 @@ export function TransactionDetailSheet({
               transactionId={transaction.id}
               currentMainCategory={transaction.mainCategory}
               currentSubCategory={transaction.subCategory}
+              currentMainCategoryIcon={transaction.mainCategoryIcon}
+              currentSubCategoryIcon={transaction.subCategoryIcon}
               transactionAmount={transaction.amount}
               transactionAmountScale={transaction.amountScale}
               onCategoryChange={() => {

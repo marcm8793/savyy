@@ -59,6 +59,7 @@ import { CategoryCombobox } from "@/components/transactions/category-combobox";
 import { TransactionDetailSheet } from "@/components/transactions/transaction-detail-sheet";
 import { formatAmount, formatSimpleAmount } from "@/lib/utils";
 import { useLocaleContext } from "@/providers/locale-provider";
+import { getCategoryIcon, getCategoryColor } from "@/lib/category-icons";
 
 // Use the transaction type but with serialized dates (as they come from tRPC)
 type Transaction = {
@@ -83,6 +84,8 @@ type Transaction = {
   // Enhanced categorization fields
   mainCategory: string | null;
   subCategory: string | null;
+  mainCategoryIcon: string | null;
+  subCategoryIcon: string | null;
   categorySource: string | null;
   categoryConfidence: string | null;
   needsReview: boolean | null;
@@ -146,7 +149,7 @@ export default function TransactionsPage() {
     dateRange,
   });
 
-  const transactions = transactionsData?.transactions || [];
+  const transactions = useMemo(() => transactionsData?.transactions || [], [transactionsData]);
 
   // Generate month options for the last 2 years
   const monthOptions = useMemo(() => {
@@ -468,23 +471,29 @@ export default function TransactionsPage() {
                                           `Ref: ${transaction.reference}`}
                                       </div>
                                       {/* Mobile category indicator */}
-                                      <div className="md:hidden flex gap-1 mt-1">
+                                      <div className="md:hidden flex items-center gap-1 mt-1">
                                         {transaction.mainCategory &&
                                         transaction.subCategory ? (
-                                          <>
+                                          <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50">
                                             <Badge
                                               variant="outline"
-                                              className="text-xs"
+                                              className="text-xs border-0 bg-transparent p-0 h-auto"
                                             >
                                               {transaction.mainCategory}
                                             </Badge>
-                                            <Badge
-                                              variant="outline"
-                                              className="text-xs"
-                                            >
-                                              {transaction.subCategory}
-                                            </Badge>
-                                          </>
+                                            <span className="text-xs text-muted-foreground">→</span>
+                                            <div className="flex items-center gap-1">
+                                              <div className={getCategoryColor(transaction.mainCategory)}>
+                                                {getCategoryIcon(transaction.subCategoryIcon || null, 12)}
+                                              </div>
+                                              <Badge
+                                                variant="outline"
+                                                className="text-xs border-0 bg-transparent p-0 h-auto"
+                                              >
+                                                {transaction.subCategory}
+                                              </Badge>
+                                            </div>
+                                          </div>
                                         ) : transaction.categoryName ? (
                                           <Badge
                                             variant="outline"
@@ -494,7 +503,7 @@ export default function TransactionsPage() {
                                           </Badge>
                                         ) : (
                                           <span
-                                            className="text-xs text-muted-foreground"
+                                            className="text-xs text-muted-foreground italic"
                                             aria-label="Transaction not categorized, tap to categorize"
                                           >
                                             Tap to categorize
@@ -521,6 +530,12 @@ export default function TransactionsPage() {
                                       }
                                       currentSubCategory={
                                         transaction.subCategory
+                                      }
+                                      currentMainCategoryIcon={
+                                        transaction.mainCategoryIcon
+                                      }
+                                      currentSubCategoryIcon={
+                                        transaction.subCategoryIcon
                                       }
                                       transactionAmount={transaction.amount}
                                       transactionAmountScale={transaction.amountScale}

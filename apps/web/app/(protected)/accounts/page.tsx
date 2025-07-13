@@ -508,7 +508,7 @@ export default function AccountsPage() {
                             {account.lastRefreshed
                               ? new Date(
                                   account.lastRefreshed
-                                ).toLocaleDateString()
+                                ).toLocaleString()
                               : "Never"}
                           </span>
                         </div>

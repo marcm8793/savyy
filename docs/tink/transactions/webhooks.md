@@ -143,7 +143,7 @@ When using the Events V2 API, we recommend you to implement signature verificati
 
 ### How to verify a signature
 
-The incoming request includes a `X-Tink-Signature` header. This header consists of two properties that are separated by a comma. The first property is the timestamp (UNIX timestamp format), with they key `t`, followed by the actual message signature key that's prefixed by `v1`.
+The incoming request includes a `X-Tink-Signature` header. This header consists of two properties that are separated by a comma. The first property is the timestamp (UNIX timestamp format), with the key `t`, followed by the actual message signature key that's prefixed by `v1`.
 
 **Example of header:**
 

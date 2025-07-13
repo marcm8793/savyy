@@ -129,7 +129,7 @@ curl -v -X DELETE https://api.tink.com/api/v1/credentials/{credentialsId} \
 
 Tink returns an HTTP 204 status code if the deletion request was successful.
 
-> **Important note:** Multiple consents that give access to the same account can exist in parallel. When you delete all consents that are related to an account, the account information and its corresponding transactions is permanently deleted.
+> **Important note:** Multiple consents that give access to the same account can exist in parallel. When you delete all consents that are related to an account, the account information and its corresponding transactions are permanently deleted.
 
 ## Delete a user
 

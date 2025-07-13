@@ -70,15 +70,13 @@ export default function AccountsPage() {
     offset: 0,
   });
 
-  const { data: providerConsents } =
-    trpc.providerConsent.list.useQuery(
-      {},
-      {
-        enabled: !!accounts?.length && connectionStatus !== "error",
-        retry: false, // Don't retry failed consent checks automatically
-      }
-    );
-
+  const { data: providerConsents } = trpc.providerConsent.list.useQuery(
+    {},
+    {
+      enabled: !!accounts?.length && connectionStatus !== "error",
+      retry: false, // Don't retry failed consent checks automatically
+    }
+  );
 
   const { mutateAsync: reconnectBankAccount } =
     trpc.account.reconnectBankAccount.useMutation();
@@ -96,7 +94,7 @@ export default function AccountsPage() {
 
     if (connected === "true") {
       setConnectionStatus("success");
-      
+
       // Clear the success status after 5 seconds to show actual status
       const clearStatusTimeout = setTimeout(() => {
         setConnectionStatus(null);
@@ -113,8 +111,12 @@ export default function AccountsPage() {
   ) => {
     if (!credentialsId) {
       console.error("No credentials ID available for account:", accountId);
-      const account = accounts?.find(acc => acc.id === accountId);
-      toast.error(`${account?.accountName || 'Account'} needs to be reconnected.`);
+      const account = accounts?.find((acc) => acc.id === accountId);
+      toast.error(
+        `${
+          account?.accountName || `Account ${accountId.slice(-4)}`
+        } needs to be reconnected.`
+      );
       return;
     }
 
@@ -134,18 +136,24 @@ export default function AccountsPage() {
       });
 
       // Find account name for toast
-      const account = accounts?.find(acc => acc.id === accountId);
-      toast.success(`Data refreshed successfully for ${account?.accountName || 'account'}!`);
+      const account = accounts?.find((acc) => acc.id === accountId);
+      toast.success(
+        `Data refreshed successfully for ${account?.accountName || "account"}!`
+      );
     } catch (error) {
       console.error("Failed to refresh account:", error);
       const errorMessage =
         error instanceof Error
           ? error.message
           : "Failed to refresh account data";
-      
+
       // Find account name for toast
-      const account = accounts?.find(acc => acc.id === accountId);
-      toast.error(`Failed to refresh ${account?.accountName || 'account'}: ${errorMessage}`);
+      const account = accounts?.find((acc) => acc.id === accountId);
+      toast.error(
+        `Failed to refresh ${
+          account?.accountName || "account"
+        }: ${errorMessage}`
+      );
     } finally {
       setRefreshingAccounts((prev) => {
         const newSet = new Set(prev);
@@ -170,15 +178,19 @@ export default function AccountsPage() {
     );
 
     const results = await Promise.allSettled(refreshPromises);
-    
+
     // Count successful refreshes
-    const successCount = results.filter(result => result.status === 'fulfilled').length;
+    const successCount = results.filter(
+      (result) => result.status === "fulfilled"
+    ).length;
     const totalCount = accountsWithCredentials.length;
-    
+
     if (successCount === totalCount) {
       toast.success(`All ${totalCount} accounts refreshed successfully!`);
     } else if (successCount > 0) {
-      toast.success(`${successCount} of ${totalCount} accounts refreshed successfully.`);
+      toast.success(
+        `${successCount} of ${totalCount} accounts refreshed successfully.`
+      );
     } else {
       toast.error("Failed to refresh account data. Please try again.");
     }
@@ -232,16 +244,20 @@ export default function AccountsPage() {
     if (account?.consentExpiresAt) {
       const consentExpiry = new Date(account.consentExpiresAt);
       const now = new Date();
-      
+
       // If consent is expired, needs reconnection
       if (consentExpiry <= now) {
         return <Badge variant="destructive">Reconnection Required</Badge>;
       }
-      
+
       // If consent expires within 7 days, show warning
-      const daysUntilExpiry = Math.floor((consentExpiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      const daysUntilExpiry = Math.floor(
+        (consentExpiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      );
       if (daysUntilExpiry <= 7) {
-        return <Badge variant="secondary">Expires in {daysUntilExpiry} days</Badge>;
+        return (
+          <Badge variant="secondary">Expires in {daysUntilExpiry} days</Badge>
+        );
       }
     }
 
@@ -285,7 +301,6 @@ export default function AccountsPage() {
   console.log("Is loading:", isLoading);
   console.log("Accounts length:", accounts?.length);
 
-
   const handleReconnectAccount = async () => {
     try {
       setIsConnecting(true);
@@ -314,7 +329,6 @@ export default function AccountsPage() {
       setIsConnecting(false);
     }
   };
-
 
   const formatAccountType = (type: string | null) => {
     if (!type) return "Unknown";
@@ -418,14 +432,17 @@ export default function AccountsPage() {
           )}
 
           {/* Reconnection Needed Alert - Only show if any account has expired consent */}
-          {accounts?.some(account => 
-            account.consentExpiresAt && new Date(account.consentExpiresAt) <= new Date()
+          {accounts?.some(
+            (account) =>
+              account.consentExpiresAt &&
+              new Date(account.consentExpiresAt) <= new Date()
           ) && (
             <Alert className="mb-6 border-orange-200 bg-orange-50">
               <AlertCircle className="h-4 w-4 text-orange-600" />
               <AlertDescription className="text-orange-800">
-                <strong>Bank reconnection required:</strong>{" "}
-                One or more of your bank consents have expired. Please reconnect your accounts to continue accessing your financial data.
+                <strong>Bank reconnection required:</strong> One or more of your
+                bank consents have expired. Please reconnect your accounts to
+                continue accessing your financial data.
               </AlertDescription>
             </Alert>
           )}
@@ -466,7 +483,11 @@ export default function AccountsPage() {
                             Balance:
                           </span>
                           <span className="font-semibold text-lg">
-                            {formatBalance(account.balance, account.currency, locale)}
+                            {formatBalance(
+                              account.balance,
+                              account.currency,
+                              locale
+                            )}
                           </span>
                         </div>
                         {account.tinkAccountId && (
@@ -484,10 +505,11 @@ export default function AccountsPage() {
                             Last Refreshed:
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {account.lastRefreshed 
-                              ? new Date(account.lastRefreshed).toLocaleDateString()
-                              : "Never"
-                            }
+                            {account.lastRefreshed
+                              ? new Date(
+                                  account.lastRefreshed
+                                ).toLocaleDateString()
+                              : "Never"}
                           </span>
                         </div>
 
@@ -499,8 +521,15 @@ export default function AccountsPage() {
                             </span>
                             <span className="text-xs text-muted-foreground">
                               {(() => {
-                                const status = getExpiryStatus(account.consentExpiresAt, locale);
-                                return <span className={status.className}>{status.text}</span>;
+                                const status = getExpiryStatus(
+                                  account.consentExpiresAt,
+                                  locale
+                                );
+                                return (
+                                  <span className={status.className}>
+                                    {status.text}
+                                  </span>
+                                );
                               })()}
                             </span>
                           </div>
@@ -522,11 +551,17 @@ export default function AccountsPage() {
                             {/* Show different buttons based on consent status */}
                             {(() => {
                               // Check if consent is expired
-                              const consentExpired = account.consentExpiresAt && 
-                                new Date(account.consentExpiresAt) <= new Date();
-                              
+                              const consentExpired =
+                                account.consentExpiresAt &&
+                                new Date(account.consentExpiresAt) <=
+                                  new Date();
+
                               // If consent is expired or not active, show reconnect button
-                              if (consentExpired || (account.consentStatus && account.consentStatus !== "ACTIVE")) {
+                              if (
+                                consentExpired ||
+                                (account.consentStatus &&
+                                  account.consentStatus !== "ACTIVE")
+                              ) {
                                 return (
                                   <Button
                                     variant="default"
@@ -595,7 +630,6 @@ export default function AccountsPage() {
                             })()}
                           </div>
                         )}
-
                       </div>
                     </CardContent>
                   </Card>

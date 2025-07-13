@@ -16,15 +16,39 @@ interface Logger {
 // Simple console logger implementation
 class ConsoleLogger implements Logger {
   error(message: string, context?: Record<string, unknown>): void {
-    console.error(message, context ? JSON.stringify(context) : "");
+    if (context) {
+      try {
+        console.error(message, JSON.stringify(context));
+      } catch {
+        console.error(message, "[Context contains non-serializable data]");
+      }
+    } else {
+      console.error(message);
+    }
   }
 
   warn(message: string, context?: Record<string, unknown>): void {
-    console.warn(message, context ? JSON.stringify(context) : "");
+    if (context) {
+      try {
+        console.warn(message, JSON.stringify(context));
+      } catch {
+        console.warn(message, "[Context contains non-serializable data]");
+      }
+    } else {
+      console.warn(message);
+    }
   }
 
   info(message: string, context?: Record<string, unknown>): void {
-    console.info(message, context ? JSON.stringify(context) : "");
+    if (context) {
+      try {
+        console.info(message, JSON.stringify(context));
+      } catch {
+        console.info(message, "[Context contains non-serializable data]");
+      }
+    } else {
+      console.info(message);
+    }
   }
 }
 
@@ -50,10 +74,18 @@ export class AICategorizationService {
   private categoryCache: CategoryStructure[] | null = null;
   private cacheExpiry: number = 0;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  private readonly BATCH_SIZE = parseInt(process.env.AI_BATCH_SIZE || "20", 10);
-  private readonly AI_API_URL = process.env.AI_API_URL || "https://api.anthropic.com/v1/messages";
+
+  private readonly BATCH_SIZE = (() => {
+    const value = parseInt(process.env.AI_BATCH_SIZE || "20", 10);
+    return isNaN(value) || value <= 0 ? 20 : value;
+  })();
+  private readonly AI_API_URL =
+    process.env.AI_API_URL || "https://api.anthropic.com/v1/messages";
   private readonly AI_MODEL = process.env.AI_MODEL || "claude-3-haiku-20240307";
-  private readonly API_TIMEOUT = parseInt(process.env.AI_API_TIMEOUT || "30000", 10); // 30 seconds
+  private readonly API_TIMEOUT = parseInt(
+    process.env.AI_API_TIMEOUT || "30000",
+    10
+  ); // 30 seconds
   private readonly logger: Logger = new ConsoleLogger();
 
   constructor() {
@@ -102,7 +134,7 @@ export class AICategorizationService {
         this.logger.error("Error in AI categorization batch", {
           error: errorMessage,
           batchSize: originalBatch.length,
-          batchStartIndex: i
+          batchStartIndex: i,
         });
 
         // Fallback to "To Classify" for failed batch
@@ -288,7 +320,7 @@ export class AICategorizationService {
       return this.parseAIResponse(content, transactions.length);
     } catch (error) {
       let errorMessage = "Unknown error";
-      
+
       if (error instanceof Error) {
         errorMessage = error.message;
         // Handle specific error types
@@ -296,12 +328,12 @@ export class AICategorizationService {
           errorMessage = `AI API timeout after ${this.API_TIMEOUT}ms`;
         }
       }
-      
+
       this.logger.error("Error calling AI API", {
         error: errorMessage,
         transactionCount: transactions.length,
         apiUrl: this.AI_API_URL,
-        model: this.AI_MODEL
+        model: this.AI_MODEL,
       });
 
       // Return fallback classifications
@@ -354,7 +386,10 @@ ${transactionList}
 Return a JSON array with exactly ${transactions.length} categorization results in the same order.`;
   }
 
-  private validateCategoryPair(mainCategory: string, subCategory: string): boolean {
+  private validateCategoryPair(
+    mainCategory: string,
+    subCategory: string
+  ): boolean {
     // Get fresh categories if cache is empty
     if (!this.categoryCache || this.categoryCache.length === 0) {
       return false;
@@ -396,13 +431,13 @@ Return a JSON array with exactly ${transactions.length} categorization results i
 
       return parsed.map((item: unknown) => {
         const result = item as { mainCategory?: string; subCategory?: string };
-        
+
         // Validate that the returned categories exist in our predefined list
         const isValidCategory = this.validateCategoryPair(
           result.mainCategory || "",
           result.subCategory || ""
         );
-        
+
         if (isValidCategory) {
           return {
             mainCategory: result.mainCategory || "To Classify",
@@ -428,7 +463,7 @@ Return a JSON array with exactly ${transactions.length} categorization results i
       this.logger.error("Error parsing AI response", {
         error: errorMessage,
         expectedCount,
-        responseContentLength: content?.length || 0
+        responseContentLength: content?.length || 0,
       });
 
       // Return fallback results

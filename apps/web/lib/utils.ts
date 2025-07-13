@@ -90,3 +90,47 @@ export function formatSimpleAmount(
     ...options,
   }).format(amount);
 }
+
+/**
+ * Calculates the expiry status for a consent expiration date with proper timezone handling.
+ * @param consentExpiresAt - The consent expiration date (string or Date)
+ * @param locale - The locale for date formatting (defaults to "en-US")
+ * @returns Object with formatted text and CSS class name for styling
+ */
+export function getExpiryStatus(
+  consentExpiresAt: string | Date,
+  locale: string = "en-US"
+): {
+  text: string;
+  className: string;
+} {
+  const expiryDate = new Date(consentExpiresAt);
+  const now = new Date();
+  
+  // Normalize to start of day to avoid timezone edge cases
+  const expiryDateStart = new Date(expiryDate);
+  expiryDateStart.setHours(0, 0, 0, 0);
+  const nowStart = new Date(now);
+  nowStart.setHours(0, 0, 0, 0);
+  
+  const daysUntilExpiry = Math.ceil(
+    (expiryDateStart.getTime() - nowStart.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (daysUntilExpiry < 0) {
+    return {
+      text: `Expired ${Math.abs(daysUntilExpiry)} days ago`,
+      className: "text-red-600 font-medium"
+    };
+  } else if (daysUntilExpiry <= 7) {
+    return {
+      text: `In ${daysUntilExpiry} days`,
+      className: "text-orange-600 font-medium"
+    };
+  } else {
+    return {
+      text: expiryDate.toLocaleDateString(locale),
+      className: "text-green-600"
+    };
+  }
+}

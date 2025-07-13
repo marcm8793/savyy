@@ -168,6 +168,11 @@ const webhookRoutes: FastifyPluginAsync = async (fastify) => {
 
     // If refresh was successful, update consent expiry data
     if (content.credentialsStatus === "UPDATED") {
+      if (!content.credentialsId) {
+        fastify.log.warn("No credentialsId in webhook content, skipping consent update");
+        return;
+      }
+
       // Find user by external user ID
       const externalUserId = context.externalUserId;
       if (externalUserId) {
@@ -188,7 +193,7 @@ const webhookRoutes: FastifyPluginAsync = async (fastify) => {
               .where(
                 and(
                   eq(bankAccount.userId, userId),
-                  eq(bankAccount.credentialsId, content.credentialsId || "")
+                  eq(bankAccount.credentialsId, content.credentialsId)
                 )
               );
 

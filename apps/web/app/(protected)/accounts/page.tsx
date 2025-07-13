@@ -37,7 +37,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { ModeToggle } from "@/components/themes/mode-toggle";
-import { formatBalance } from "@/lib/utils";
+import { formatBalance, getExpiryStatus } from "@/lib/utils";
 import { useLocaleContext } from "@/providers/locale-provider";
 import Link from "next/link";
 
@@ -513,29 +513,8 @@ export default function AccountsPage() {
                             </span>
                             <span className="text-xs text-muted-foreground">
                               {(() => {
-                                const expiryDate = new Date(account.consentExpiresAt);
-                                const now = new Date();
-                                const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                                
-                                if (daysUntilExpiry < 0) {
-                                  return (
-                                    <span className="text-red-600 font-medium">
-                                      Expired {Math.abs(daysUntilExpiry)} days ago
-                                    </span>
-                                  );
-                                } else if (daysUntilExpiry <= 7) {
-                                  return (
-                                    <span className="text-orange-600 font-medium">
-                                      In {daysUntilExpiry} days
-                                    </span>
-                                  );
-                                } else {
-                                  return (
-                                    <span className="text-green-600">
-                                      {expiryDate.toLocaleDateString()}
-                                    </span>
-                                  );
-                                }
+                                const status = getExpiryStatus(account.consentExpiresAt, locale);
+                                return <span className={status.className}>{status.text}</span>;
                               })()}
                             </span>
                           </div>

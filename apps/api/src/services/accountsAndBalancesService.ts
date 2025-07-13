@@ -141,6 +141,7 @@ export class AccountsAndBalancesService {
         !consentsResponse.providerConsents ||
         consentsResponse.providerConsents.length === 0
       ) {
+        console.log("No provider consents found for user");
         return null;
       }
 
@@ -152,16 +153,28 @@ export class AccountsAndBalancesService {
         : consentsResponse.providerConsents[0]; // Use first consent if no credentialsId provided
 
       if (matchingConsent?.sessionExpiryDate) {
-        return new Date(matchingConsent.sessionExpiryDate);
+        const expiryDate = new Date(matchingConsent.sessionExpiryDate);
+        // Validate the date
+        if (isNaN(expiryDate.getTime())) {
+          console.error(
+            "Invalid sessionExpiryDate format:",
+            matchingConsent.sessionExpiryDate
+          );
+          return null;
+        }
+        return expiryDate;
       }
 
       return null;
     } catch (error) {
-      console.error("Failed to fetch consent expiry data:", error);
+      console.error("Failed to fetch consent expiry data:", {
+        error: error instanceof Error ? error.message : String(error),
+        credentialsId,
+        hasToken: !!userAccessToken,
+      });
       return null;
     }
   }
-
   /**
    * Decrypt sensitive account fields
    */

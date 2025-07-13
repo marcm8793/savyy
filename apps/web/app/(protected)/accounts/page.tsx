@@ -39,6 +39,7 @@ import {
 import { ModeToggle } from "@/components/themes/mode-toggle";
 import { formatBalance, getExpiryStatus } from "@/lib/utils";
 import { useLocaleContext } from "@/providers/locale-provider";
+import { toast } from "sonner";
 import Link from "next/link";
 
 export default function AccountsPage() {
@@ -49,9 +50,6 @@ export default function AccountsPage() {
   const [refreshingAccounts, setRefreshingAccounts] = useState<Set<string>>(
     new Set()
   );
-  const [refreshResults, setRefreshResults] = useState<
-    Record<string, { success: boolean; message: string }>
-  >({});
 
   const timeoutIds = useRef<NodeJS.Timeout[]>([]);
 
@@ -67,13 +65,12 @@ export default function AccountsPage() {
     data: accounts,
     isLoading,
     error,
-    refetch,
   } = trpc.account.getAccountsFromDb.useQuery({
     limit: 50,
     offset: 0,
   });
 
-  const { data: providerConsents, refetch: refetchConsents } =
+  const { data: providerConsents } =
     trpc.providerConsent.list.useQuery(
       {},
       {
@@ -99,13 +96,7 @@ export default function AccountsPage() {
 
     if (connected === "true") {
       setConnectionStatus("success");
-      // Add a small delay to ensure backend has processed the token update
-      const refetchTimeout = setTimeout(() => {
-        refetch(); // Refetch accounts data
-        refetchConsents(); // Refetch consent data to get updated status
-      }, 1000);
-      timeoutIds.current.push(refetchTimeout);
-
+      
       // Clear the success status after 5 seconds to show actual status
       const clearStatusTimeout = setTimeout(() => {
         setConnectionStatus(null);
@@ -114,7 +105,7 @@ export default function AccountsPage() {
     } else if (error) {
       setConnectionStatus("error");
     }
-  }, [searchParams, refetch, refetchConsents]);
+  }, [searchParams]);
 
   const handleRefreshAccount = async (
     credentialsId: string,
@@ -122,24 +113,13 @@ export default function AccountsPage() {
   ) => {
     if (!credentialsId) {
       console.error("No credentials ID available for account:", accountId);
-      setRefreshResults((prev) => ({
-        ...prev,
-        [accountId]: {
-          success: false,
-          message:
-            "No credentials ID available. Please reconnect your bank account.",
-        },
-      }));
+      const account = accounts?.find(acc => acc.id === accountId);
+      toast.error(`${account?.accountName || 'Account'} needs to be reconnected.`);
       return;
     }
 
     try {
       setRefreshingAccounts((prev) => new Set(prev).add(accountId));
-      setRefreshResults((prev) => {
-        const newResults = { ...prev };
-        delete newResults[accountId]; // Clear previous result
-        return newResults;
-      });
 
       console.log(
         "Refreshing credentials for account:",
@@ -148,37 +128,24 @@ export default function AccountsPage() {
         credentialsId
       );
 
-      const result = await refreshCredentials({
+      await refreshCredentials({
         credentialsId,
         force: false,
       });
 
-      setRefreshResults((prev) => ({
-        ...prev,
-        [accountId]: {
-          success: true,
-          message: result.message || "Refresh initiated successfully!",
-        },
-      }));
-
-      // Refetch accounts after a short delay to show updated data
-      const refetchDelayTimeout = setTimeout(() => {
-        refetch();
-      }, 2000);
-      timeoutIds.current.push(refetchDelayTimeout);
+      // Find account name for toast
+      const account = accounts?.find(acc => acc.id === accountId);
+      toast.success(`Data refreshed successfully for ${account?.accountName || 'account'}!`);
     } catch (error) {
       console.error("Failed to refresh account:", error);
       const errorMessage =
         error instanceof Error
           ? error.message
           : "Failed to refresh account data";
-      setRefreshResults((prev) => ({
-        ...prev,
-        [accountId]: {
-          success: false,
-          message: errorMessage,
-        },
-      }));
+      
+      // Find account name for toast
+      const account = accounts?.find(acc => acc.id === accountId);
+      toast.error(`Failed to refresh ${account?.accountName || 'account'}: ${errorMessage}`);
     } finally {
       setRefreshingAccounts((prev) => {
         const newSet = new Set(prev);
@@ -202,7 +169,19 @@ export default function AccountsPage() {
       handleRefreshAccount(account.credentialsId!, account.id)
     );
 
-    await Promise.allSettled(refreshPromises);
+    const results = await Promise.allSettled(refreshPromises);
+    
+    // Count successful refreshes
+    const successCount = results.filter(result => result.status === 'fulfilled').length;
+    const totalCount = accountsWithCredentials.length;
+    
+    if (successCount === totalCount) {
+      toast.success(`All ${totalCount} accounts refreshed successfully!`);
+    } else if (successCount > 0) {
+      toast.success(`${successCount} of ${totalCount} accounts refreshed successfully.`);
+    } else {
+      toast.error("Failed to refresh account data. Please try again.");
+    }
   };
 
   const handleUpdateConsent = async (credentialsId: string) => {
@@ -239,37 +218,45 @@ export default function AccountsPage() {
   };
 
   const getConsentStatusBadge = (credentialsId: string) => {
-    // Check if we need reconnection first
-    if (providerConsents?.needsReconnection) {
-      return <Badge variant="destructive">Reconnection Required</Badge>;
-    }
-
     // If we just connected successfully, show positive status briefly
     if (connectionStatus === "success") {
       return <Badge variant="default">Recently Connected</Badge>;
     }
 
-    // Check if we have an account with expired token
+    // Find the account to check consent status
     const account = accounts?.find(
       (acc) => acc.credentialsId === credentialsId
     );
-    if (
-      account?.tokenExpiresAt &&
-      new Date(account.tokenExpiresAt) <= new Date()
-    ) {
-      return <Badge variant="destructive">Session Expired</Badge>;
+
+    // Check consent expiry first - this is what matters to users
+    if (account?.consentExpiresAt) {
+      const consentExpiry = new Date(account.consentExpiresAt);
+      const now = new Date();
+      
+      // If consent is expired, needs reconnection
+      if (consentExpiry <= now) {
+        return <Badge variant="destructive">Reconnection Required</Badge>;
+      }
+      
+      // If consent expires within 7 days, show warning
+      const daysUntilExpiry = Math.floor((consentExpiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysUntilExpiry <= 7) {
+        return <Badge variant="secondary">Expires in {daysUntilExpiry} days</Badge>;
+      }
     }
 
+    // Check consent status from database
+    if (account?.consentStatus && account.consentStatus !== "ACTIVE") {
+      return <Badge variant="destructive">Reconnection Required</Badge>;
+    }
+
+    // Check provider consent data if available
     const consent = getConsentStatus(credentialsId);
 
     if (!consent) {
-      // If we don't have consent data but have a valid token, show checking status
-      if (
-        account?.accessToken &&
-        account?.tokenExpiresAt &&
-        new Date(account.tokenExpiresAt) > new Date()
-      ) {
-        return <Badge variant="outline">Checking...</Badge>;
+      // If we have active consent in DB, show as connected
+      if (account?.consentStatus === "ACTIVE") {
+        return <Badge variant="default">Connected</Badge>;
       }
       return <Badge variant="secondary">Unknown</Badge>;
     }
@@ -279,7 +266,7 @@ export default function AccountsPage() {
     }
 
     if (consent.status === "UPDATED") {
-      return <Badge variant="default">Active</Badge>;
+      return <Badge variant="default">Connected</Badge>;
     }
 
     return <Badge variant="secondary">{consent.status}</Badge>;
@@ -381,9 +368,6 @@ export default function AccountsPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button onClick={() => refetch()} variant="outline">
-                Refresh Accounts
-              </Button>
               {accounts && accounts.length > 0 && (
                 <Button
                   onClick={handleRefreshAllAccounts}
@@ -433,15 +417,15 @@ export default function AccountsPage() {
             </Alert>
           )}
 
-          {/* Reconnection Needed Alert */}
-          {providerConsents?.needsReconnection && (
+          {/* Reconnection Needed Alert - Only show if any account has expired consent */}
+          {accounts?.some(account => 
+            account.consentExpiresAt && new Date(account.consentExpiresAt) <= new Date()
+          ) && (
             <Alert className="mb-6 border-orange-200 bg-orange-50">
               <AlertCircle className="h-4 w-4 text-orange-600" />
               <AlertDescription className="text-orange-800">
                 <strong>Bank reconnection required:</strong>{" "}
-                {"message" in providerConsents
-                  ? providerConsents.message
-                  : "Your bank session has expired. Please reconnect your accounts to continue accessing your financial data."}
+                One or more of your bank consents have expired. Please reconnect your accounts to continue accessing your financial data.
               </AlertDescription>
             </Alert>
           )}
@@ -451,7 +435,6 @@ export default function AccountsPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {accounts.map((account) => {
                 const isRefreshing = refreshingAccounts.has(account.id);
-                const refreshResult = refreshResults[account.id];
 
                 return (
                   <Card
@@ -498,10 +481,13 @@ export default function AccountsPage() {
                         )}
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-muted-foreground">
-                            Last Updated:
+                            Last Refreshed:
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(account.updatedAt).toLocaleDateString()}
+                            {account.lastRefreshed 
+                              ? new Date(account.lastRefreshed).toLocaleDateString()
+                              : "Never"
+                            }
                           </span>
                         </div>
 
@@ -535,8 +521,12 @@ export default function AccountsPage() {
                           <div className="pt-2 border-t space-y-2">
                             {/* Show different buttons based on consent status */}
                             {(() => {
-                              // If we need reconnection, show reconnect button
-                              if (providerConsents?.needsReconnection) {
+                              // Check if consent is expired
+                              const consentExpired = account.consentExpiresAt && 
+                                new Date(account.consentExpiresAt) <= new Date();
+                              
+                              // If consent is expired or not active, show reconnect button
+                              if (consentExpired || (account.consentStatus && account.consentStatus !== "ACTIVE")) {
                                 return (
                                   <Button
                                     variant="default"
@@ -560,7 +550,7 @@ export default function AccountsPage() {
                                 );
                               }
 
-                              // Check individual consent status
+                              // Check individual consent status from provider
                               const consent = getConsentStatus(
                                 account.credentialsId!
                               );
@@ -606,31 +596,6 @@ export default function AccountsPage() {
                           </div>
                         )}
 
-                        {/* Refresh Result Alert */}
-                        {refreshResult && (
-                          <Alert
-                            className={`${
-                              refreshResult.success
-                                ? "border-green-200 bg-green-50"
-                                : "border-red-200 bg-red-50"
-                            }`}
-                          >
-                            {refreshResult.success ? (
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 text-red-600" />
-                            )}
-                            <AlertDescription
-                              className={
-                                refreshResult.success
-                                  ? "text-green-800"
-                                  : "text-red-800"
-                              }
-                            >
-                              {refreshResult.message}
-                            </AlertDescription>
-                          </Alert>
-                        )}
                       </div>
                     </CardContent>
                   </Card>

@@ -1,15 +1,27 @@
 import { TinkWebhookService } from "../src/services/tinkWebhookService.js";
 import "dotenv/config";
 
+/**
+ * Setup Tink webhook endpoint
+ * 
+ * Webhook URL can be provided via:
+ * 1. TINK_WEBHOOK_URL environment variable (recommended)
+ * 2. Command line argument: tsx setup-webhook.ts <webhook-url>
+ * 
+ * Example: TINK_WEBHOOK_URL=https://yourdomain.com/api/webhook/tink
+ */
 async function setupWebhook() {
   try {
     console.log("Setting up Tink webhook...");
 
-    const webhookUrl = process.argv[2];
+    // Read webhook URL from environment variable first, then command line argument
+    const webhookUrl = process.env.TINK_WEBHOOK_URL || process.argv[2];
     console.log("Webhook URL:", webhookUrl);
 
     if (!webhookUrl) {
-      console.error("Usage: tsx setup-webhook.ts <webhook-url>");
+      console.error("Webhook URL is required. Provide it via:");
+      console.error("1. Environment variable: TINK_WEBHOOK_URL=https://yourdomain.com/api/webhook/tink");
+      console.error("2. Command line argument: tsx setup-webhook.ts <webhook-url>");
       console.error(
         "Example: tsx setup-webhook.ts https://yourdomain.com/api/webhook/tink"
       );

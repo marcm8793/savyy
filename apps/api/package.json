@@ -20,7 +20,7 @@
     "db:push": "npx drizzle-kit push --config=./db/drizzle.config.ts",
     "db:studio": "npx drizzle-kit studio --config=./db/drizzle.config.ts",
     "db:drop": "tsx scripts/drop-database.ts drop",
-    "webhook:setup": "tsx scripts/setup-webhook.ts https://pheasant-cunning-rodent.ngrok-free.app/api/webhook/tink",
+    "webhook:setup": "tsx scripts/setup-webhook.ts",
     "webhook:list": "tsx scripts/list-webhooks.ts",
     "webhook:delete": "tsx scripts/delete-webhook.ts",
     "webhook:test": "tsx scripts/test-webhook.ts",

@@ -532,10 +532,29 @@ export const transactionRouter = router({
         );
 
         if (!tokenResult) {
+          // Check if this is a consent expiry or just a token refresh failure
+          const accountData = await db
+            .select()
+            .from(bankAccount)
+            .where(eq(bankAccount.id, bankAcc.id))
+            .limit(1);
+          
+          if (accountData.length > 0 && accountData[0].consentExpiresAt) {
+            const consentExpired = new Date(accountData[0].consentExpiresAt) <= new Date();
+            if (consentExpired) {
+              throw new TRPCError({
+                code: "UNAUTHORIZED",
+                message:
+                  "Your bank consent has expired and needs to be renewed. Please reconnect your bank account to continue accessing your financial data.",
+              });
+            }
+          }
+          
+          // Token refresh failed but consent might still be valid
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message:
-              "Your bank connection has expired and needs to be renewed. Please reconnect your bank account to continue accessing your financial data.",
+              "Unable to refresh access token. This may be temporary. If the issue persists, you may need to reconnect your bank account.",
           });
         }
 

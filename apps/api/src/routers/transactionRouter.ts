@@ -727,7 +727,7 @@ export const transactionRouter = router({
         const conditions = [
           eq(transaction.userId, user.id),
           // Filter for transactions that need review
-          sql`(${transaction.needsReview} = true OR (${transaction.mainCategory} IS NULL AND ${transaction.categoryName} IS NULL))`,
+          sql`(${transaction.mainCategory} = 'To Classify' OR ${transaction.mainCategory} IS NULL)`,
         ];
 
         if (input.accountIds && input.accountIds.length > 0) {
@@ -863,7 +863,7 @@ export const transactionRouter = router({
             totalNeedsReview: sql<number>`
               COUNT(
                 CASE
-                  WHEN ${transaction.needsReview} = true OR (${transaction.mainCategory} IS NULL AND ${transaction.categoryName} IS NULL)
+                  WHEN ${transaction.mainCategory} = 'To Classify' OR ${transaction.mainCategory} IS NULL
                   THEN 1
                 END
               )::int
@@ -871,7 +871,7 @@ export const transactionRouter = router({
             totalAutomated: sql<number>`
               COUNT(
                 CASE
-                  WHEN ${transaction.mainCategory} IS NOT NULL AND ${transaction.categorySource} != 'user'
+                  WHEN ${transaction.mainCategory} IS NOT NULL AND ${transaction.userModified} = false
                   THEN 1
                 END
               )::int
@@ -879,7 +879,7 @@ export const transactionRouter = router({
             totalUserCategorized: sql<number>`
               COUNT(
                 CASE
-                  WHEN ${transaction.categorySource} = 'user'
+                  WHEN ${transaction.userModified} = true
                   THEN 1
                 END
               )::int
@@ -891,13 +891,13 @@ export const transactionRouter = router({
         // Get categorization source breakdown
         const sourceStatsResult = await db
           .select({
-            source: sql<string>`COALESCE(${transaction.categorySource}, 'uncategorized')`,
+            source: sql<string>`CASE WHEN ${transaction.userModified} = true THEN 'user' WHEN ${transaction.mainCategory} IS NOT NULL THEN 'ai' ELSE 'uncategorized' END`,
             count: sql<number>`COUNT(*)::int`,
           })
           .from(transaction)
           .where(and(...conditions))
           .groupBy(
-            sql`COALESCE(${transaction.categorySource}, 'uncategorized')`
+            sql`CASE WHEN ${transaction.userModified} = true THEN 'user' WHEN ${transaction.mainCategory} IS NOT NULL THEN 'ai' ELSE 'uncategorized' END`
           );
 
         const basicStats = basicStatsResult[0];
@@ -1090,10 +1090,7 @@ export const transactionRouter = router({
           .set({
             mainCategory: input.mainCategory,
             subCategory: input.subCategory,
-            categorySource: "user",
-            categoryConfidence: "1.00",
-            needsReview: false,
-            categorizedAt: new Date(),
+            userModified: true,
             updatedAt: new Date(),
           })
           .where(eq(transaction.id, input.transactionId));

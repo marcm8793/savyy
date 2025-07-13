@@ -2,7 +2,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, and, sql } from "drizzle-orm";
 import { schema, bankAccount, transaction } from "../../../db/schema";
 import { TinkTransaction, StorageResult } from "./types";
-import { transactionCategorizationService } from "./transactionCategorizationService";
+import { AICategorizationService } from "./aiCategorizationService";
 import { getEncryptionService } from "../encryptionService";
 import { encryptionResultToFields } from "../../types/encryption";
 
@@ -14,6 +14,7 @@ import { encryptionResultToFields } from "../../types/encryption";
 export class TransactionStorageService {
   private readonly BATCH_SIZE = 50;
   private readonly encryptionService = getEncryptionService();
+  private readonly aiCategorizationService = new AICategorizationService();
 
   // TODO: method to be used
   /**
@@ -71,11 +72,10 @@ export class TransactionStorageService {
     userId: string,
     bankAccountId: string,
     tinkTransactions: TinkTransaction[]
-  ): Promise<StorageResult & { categorized: number }> {
+  ): Promise<StorageResult> {
     const errors: string[] = [];
     let totalCreated = 0;
     let totalUpdated = 0;
-    let totalCategorized = 0;
 
     // Process in batches for better performance
     for (let i = 0; i < tinkTransactions.length; i += this.BATCH_SIZE) {
@@ -83,76 +83,75 @@ export class TransactionStorageService {
 
       try {
         await db.transaction(async (tx) => {
-          // ✨ NEW: Categorize the batch before storage
-          const categorizedBatch =
-            await transactionCategorizationService.categorizeBatch(
-              tx,
-              userId,
-              batch
-            );
+          // Categorize the batch before storage using AI
+          const categorizations = await this.aiCategorizationService.categorizeBatch(
+            tx,
+            batch
+          );
 
-          // Prepare batch data for bulk upsert with enhanced categorization
-          const batchData = categorizedBatch.map((categorizedTx) => {
-            const { categorization } = categorizedTx;
+          // Prepare batch data for bulk upsert with AI categorization
+          const batchData = batch.map((tinkTx) => {
+            const categorization = categorizations.get(tinkTx.id) || {
+              mainCategory: "To Classify",
+              subCategory: "Needs Review",
+              userModified: false,
+            };
 
             return {
               userId,
-              tinkTransactionId: categorizedTx.id,
-              tinkAccountId: categorizedTx.accountId,
+              tinkTransactionId: tinkTx.id,
+              tinkAccountId: tinkTx.accountId,
               bankAccountId,
-              amount: categorizedTx.amount.value.unscaledValue,
-              amountScale: parseInt(categorizedTx.amount.value.scale) || 0,
-              currencyCode: categorizedTx.amount.currencyCode,
-              bookedDate: categorizedTx.dates.booked,
+              amount: tinkTx.amount.value.unscaledValue,
+              amountScale: parseInt(tinkTx.amount.value.scale) || 0,
+              currencyCode: tinkTx.amount.currencyCode,
+              bookedDate: tinkTx.dates.booked,
               valueDate:
-                categorizedTx.dates.value || categorizedTx.dates.booked,
-              status: categorizedTx.status,
-              originalStatus: categorizedTx.status, // Store original status for new transactions
+                tinkTx.dates.value || tinkTx.dates.booked,
+              status: tinkTx.status,
+              originalStatus: tinkTx.status, // Store original status for new transactions
               statusLastUpdated: new Date(), // Always update status timestamp
               displayDescription: (
-                categorizedTx.descriptions.display ?? ""
+                tinkTx.descriptions.display ?? ""
               ).substring(0, 500),
               originalDescription: (
-                categorizedTx.descriptions.original ?? ""
+                tinkTx.descriptions.original ?? ""
               ).substring(0, 500),
               providerTransactionId:
-                categorizedTx.identifiers?.providerTransactionId?.substring(
+                tinkTx.identifiers?.providerTransactionId?.substring(
                   0,
                   255
                 ),
               merchantName:
-                categorizedTx.merchantInformation?.merchantName?.substring(
+                tinkTx.merchantInformation?.merchantName?.substring(
                   0,
                   255
                 ),
               merchantCategoryCode:
-                categorizedTx.merchantInformation?.merchantCategoryCode?.substring(
+                tinkTx.merchantInformation?.merchantCategoryCode?.substring(
                   0,
                   10
                 ),
 
               // Original Tink categories (preserved)
-              categoryId: categorizedTx.categories?.pfm?.id?.substring(0, 255),
-              categoryName: categorizedTx.categories?.pfm?.name?.substring(
+              categoryId: tinkTx.categories?.pfm?.id?.substring(0, 255),
+              categoryName: tinkTx.categories?.pfm?.name?.substring(
                 0,
                 255
               ),
 
-              // ✨ NEW: Enhanced categorization fields
+              // Simplified AI categorization
               mainCategory: categorization.mainCategory,
               subCategory: categorization.subCategory,
-              categorySource: categorization.source,
-              categoryConfidence: categorization.confidence.toString(),
-              needsReview: categorization.needsReview,
-              categorizedAt: new Date(),
+              userModified: categorization.userModified,
 
-              transactionType: categorizedTx.types?.type?.substring(0, 50),
+              transactionType: tinkTx.types?.type?.substring(0, 50),
               financialInstitutionTypeCode:
-                categorizedTx.types?.financialInstitutionTypeCode?.substring(
+                tinkTx.types?.financialInstitutionTypeCode?.substring(
                   0,
                   10
                 ),
-              reference: categorizedTx.reference?.substring(0, 255),
+              reference: tinkTx.reference?.substring(0, 255),
               createdAt: new Date(),
               updatedAt: new Date(),
             };
@@ -181,13 +180,10 @@ export class TransactionStorageService {
                 categoryId: sql`EXCLUDED.category_id`,
                 categoryName: sql`EXCLUDED.category_name`,
 
-                // ✨ NEW: Update categorization fields
+                // AI categorization fields
                 mainCategory: sql`EXCLUDED.main_category`,
                 subCategory: sql`EXCLUDED.sub_category`,
-                categorySource: sql`EXCLUDED.category_source`,
-                categoryConfidence: sql`EXCLUDED.category_confidence`,
-                needsReview: sql`EXCLUDED.needs_review`,
-                categorizedAt: sql`EXCLUDED.categorized_at`,
+                userModified: sql`EXCLUDED.user_modified`,
 
                 updatedAt: sql`EXCLUDED.updated_at`,
               },
@@ -207,10 +203,9 @@ export class TransactionStorageService {
 
           totalCreated += batchCreated;
           totalUpdated += batchUpdated;
-          totalCategorized += result.length; // All transactions were categorized
 
           console.log(
-            `Batch processed: ${batchCreated} created, ${batchUpdated} updated, ${result.length} categorized`
+            `Batch processed: ${batchCreated} created, ${batchUpdated} updated`
           );
         });
       } catch (error) {
@@ -225,7 +220,6 @@ export class TransactionStorageService {
       created: totalCreated,
       updated: totalUpdated,
       errors,
-      categorized: totalCategorized,
     };
   }
 

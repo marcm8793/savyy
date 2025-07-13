@@ -22,14 +22,14 @@ vi.mock("../../../../src/services/encryptionService", () => {
   };
 });
 
-// Mock the categorization service
+// Mock the AI categorization service
 vi.mock(
-  "../../../../src/services/transaction/transactionCategorizationService"
+  "../../../../src/services/transaction/aiCategorizationService"
 );
 
 // Import after mocking
 import { TransactionStorageService } from "../../../../src/services/transaction/transactionStorageService";
-import { transactionCategorizationService } from "../../../../src/services/transaction/transactionCategorizationService";
+import { AICategorizationService } from "../../../../src/services/transaction/aiCategorizationService";
 
 describe("TransactionStorageService", () => {
   let service: TransactionStorageService;
@@ -81,16 +81,13 @@ describe("TransactionStorageService", () => {
     reference: "REF123",
   };
 
-  const mockCategorizedTransaction = {
-    ...mockTinkTransaction,
-    categorization: {
+  const mockCategorization = new Map([
+    [mockTinkTransaction.id, {
       mainCategory: "Food & Dining",
       subCategory: "Restaurants",
-      source: "tink",
-      confidence: 0.85,
-      needsReview: false,
-    },
-  };
+      userModified: false,
+    }]
+  ]);
 
   const mockBankAccount = {
     id: mockBankAccountId,
@@ -107,8 +104,8 @@ describe("TransactionStorageService", () => {
     vi.clearAllMocks();
     service = new TransactionStorageService();
 
-    // Get mocked categorization service
-    mockCategorizationService = vi.mocked(transactionCategorizationService);
+    // Get mocked AI categorization service
+    mockCategorizationService = vi.mocked(AICategorizationService.prototype);
 
     // Create flexible mocks for database operations
     let mockResult = [mockBankAccount];
@@ -168,9 +165,9 @@ describe("TransactionStorageService", () => {
     };
 
     // Default mock implementations
-    mockCategorizationService.categorizeBatch.mockResolvedValue([
-      mockCategorizedTransaction,
-    ]);
+    mockCategorizationService.categorizeBatch.mockResolvedValue(
+      mockCategorization
+    );
   });
 
   afterEach(() => {
@@ -179,8 +176,17 @@ describe("TransactionStorageService", () => {
 
   describe("storeTransactionsWithUpsert", () => {
     it("should handle categorization errors gracefully", async () => {
-      mockCategorizationService.categorizeBatch.mockRejectedValue(
-        new Error("Categorization failed")
+      // Mock AI service to return fallback categorization
+      const fallbackCategorization = new Map([
+        [mockTinkTransaction.id, {
+          mainCategory: "To Classify",
+          subCategory: "Needs Review",
+          userModified: false,
+        }]
+      ]);
+      
+      mockCategorizationService.categorizeBatch.mockResolvedValue(
+        fallbackCategorization
       );
 
       const result = await service.storeTransactionsWithUpsert(
@@ -190,11 +196,9 @@ describe("TransactionStorageService", () => {
         [mockTinkTransaction]
       );
 
-      expect(result.created).toBe(0);
+      expect(result.created).toBe(1);
       expect(result.updated).toBe(0);
-      expect(result.categorized).toBe(0);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0]).toContain("Categorization failed");
+      expect(result.errors).toHaveLength(0);
     });
 
     it("should handle transactions with minimal data", async () => {
@@ -218,20 +222,17 @@ describe("TransactionStorageService", () => {
         status: "BOOKED",
       };
 
-      const minimalCategorized = {
-        ...minimalTransaction,
-        categorization: {
-          mainCategory: "Other",
-          subCategory: "Uncategorized",
-          source: "default",
-          confidence: 0.1,
-          needsReview: true,
-        },
-      };
-
-      mockCategorizationService.categorizeBatch.mockResolvedValue([
-        minimalCategorized,
+      const minimalCategorization = new Map([
+        [minimalTransaction.id, {
+          mainCategory: "To Classify",
+          subCategory: "Needs Review",
+          userModified: false,
+        }]
       ]);
+
+      mockCategorizationService.categorizeBatch.mockResolvedValue(
+        minimalCategorization
+      );
 
       const result = await service.storeTransactionsWithUpsert(
         mockDb,
@@ -269,14 +270,17 @@ describe("TransactionStorageService", () => {
         // All optional fields omitted
       };
 
-      const categorizedSparse = {
-        ...sparseTransaction,
-        categorization: mockCategorizedTransaction.categorization,
-      };
-
-      mockCategorizationService.categorizeBatch.mockResolvedValue([
-        categorizedSparse,
+      const sparseCategorization = new Map([
+        [sparseTransaction.id, {
+          mainCategory: "To Classify",
+          subCategory: "Needs Review",
+          userModified: false,
+        }]
       ]);
+
+      mockCategorizationService.categorizeBatch.mockResolvedValue(
+        sparseCategorization
+      );
 
       const result = await service.storeTransactionsWithUpsert(
         mockDb,

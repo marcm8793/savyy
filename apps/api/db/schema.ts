@@ -7,7 +7,6 @@ import {
   boolean,
   numeric,
   pgEnum,
-  decimal,
   index,
 } from "drizzle-orm/pg-core";
 import { createSelectSchema, createInsertSchema } from "drizzle-zod";
@@ -235,16 +234,10 @@ export const transaction = pgTable("transactions", {
   ), // Track when status last changed
   originalStatus: varchar("original_status", { length: 20 }), // Track original status for audit
 
-  // Enhanced category information with rule-based categorization
+  // Simplified category information
   mainCategory: varchar("main_category", { length: 100 }), // Our main category (Food & Dining, Transportation, etc.)
   subCategory: varchar("sub_category", { length: 100 }), // Our subcategory (Restaurants, Coffee, Gas, etc.)
-  categorySource: varchar("category_source", { length: 20 }), // 'tink', 'mcc', 'merchant', 'description', 'amount', 'user'
-  categoryConfidence: decimal("category_confidence", {
-    precision: 3,
-    scale: 2,
-  }), // 0.00 to 1.00
-  needsReview: boolean("needs_review").default(false), // Flag for manual review
-  categorizedAt: timestamp("categorized_at"), // When categorization was applied
+  userModified: boolean("user_modified").default(false), // Flag for user-modified categorization
 
   // Internal tracking
   bankAccountId: text("bank_account_id")
@@ -313,124 +306,6 @@ export const subCategory = pgTable(
   ]
 );
 
-// Category rules table - rules for automatic categorization
-export const categoryRule = pgTable(
-  "category_rules",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }), // null for global rules
-    ruleType: varchar("rule_type", { length: 20 }).notNull(), // 'merchant', 'description', 'mcc', 'amount_range'
-    pattern: varchar("pattern", { length: 500 }).notNull(), // The pattern to match
-    mainCategory: varchar("main_category", { length: 100 }).notNull(),
-    subCategory: varchar("sub_category", { length: 100 }).notNull(),
-    confidence: decimal("confidence", { precision: 3, scale: 2 }).notNull(), // Rule confidence score
-    isActive: boolean("is_active").default(true),
-    priority: integer("priority").default(100), // Lower number = higher priority
-
-    // Additional conditions for complex rules
-    amountMin: numeric("amount_min"), // For amount-based rules
-    amountMax: numeric("amount_max"), // For amount-based rules
-    transactionType: varchar("transaction_type", { length: 20 }), // 'debit', 'credit', 'both'
-
-    // Usage statistics
-    timesApplied: integer("times_applied").default(0),
-    lastApplied: timestamp("last_applied"),
-
-    createdAt: timestamp("created_at")
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: timestamp("updated_at")
-      .$defaultFn(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("idx_category_rule_user_type").on(table.userId, table.ruleType),
-    index("idx_category_rule_type_pattern").on(table.ruleType, table.pattern),
-    index("idx_category_rule_priority").on(table.priority),
-  ]
-);
-
-// User category corrections - learn from user input
-export const userCategoryCorrection = pgTable(
-  "user_category_corrections",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    transactionId: text("transaction_id")
-      .notNull()
-      .references(() => transaction.id, { onDelete: "cascade" }),
-
-    // Original categorization
-    originalMainCategory: varchar("original_main_category", { length: 100 }),
-    originalSubCategory: varchar("original_sub_category", { length: 100 }),
-    originalSource: varchar("original_source", { length: 20 }),
-
-    // User's correction
-    correctedMainCategory: varchar("corrected_main_category", {
-      length: 100,
-    }).notNull(),
-    correctedSubCategory: varchar("corrected_sub_category", {
-      length: 100,
-    }).notNull(),
-
-    // Context for learning
-    merchantName: varchar("merchant_name", { length: 255 }),
-    description: varchar("description", { length: 500 }),
-    amount: numeric("amount"),
-
-    // Learning metadata
-    hasGeneratedRule: boolean("has_generated_rule").default(false), // Whether this correction created a new rule
-    ruleId: text("rule_id").references(() => categoryRule.id), // Link to generated rule
-
-    createdAt: timestamp("created_at")
-      .$defaultFn(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("idx_user_correction_user_transaction").on(
-      table.userId,
-      table.transactionId
-    ),
-    index("idx_user_correction_user").on(table.userId),
-    index("idx_user_correction_merchant").on(table.merchantName),
-  ]
-);
-
-// MCC (Merchant Category Code) mappings
-export const mccCategoryMapping = pgTable(
-  "mcc_category_mappings",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    mccCode: varchar("mcc_code", { length: 4 }).notNull().unique(),
-    mccDescription: varchar("mcc_description", { length: 255 }).notNull(),
-    mainCategory: varchar("main_category", { length: 100 }).notNull(),
-    subCategory: varchar("sub_category", { length: 100 }).notNull(),
-    confidence: decimal("confidence", { precision: 3, scale: 2 }).default(
-      "0.80"
-    ),
-    isActive: boolean("is_active").default(true),
-    createdAt: timestamp("created_at")
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: timestamp("updated_at")
-      .$defaultFn(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("idx_mcc_code").on(table.mccCode),
-    index("idx_mcc_main_category").on(table.mainCategory),
-    index("idx_mcc_sub_category").on(table.subCategory),
-  ]
-);
-
 // Export schema object for Drizzle Kit configuration
 export const schema = {
   user,
@@ -441,9 +316,6 @@ export const schema = {
   transaction,
   mainCategory,
   subCategory,
-  categoryRule,
-  userCategoryCorrection,
-  mccCategoryMapping,
 };
 
 // Export inferred types from Drizzle schemas
@@ -471,16 +343,6 @@ export type MainCategoryInsert = typeof mainCategory.$inferInsert;
 export type SubCategory = typeof subCategory.$inferSelect;
 export type SubCategoryInsert = typeof subCategory.$inferInsert;
 
-export type CategoryRule = typeof categoryRule.$inferSelect;
-export type CategoryRuleInsert = typeof categoryRule.$inferInsert;
-
-export type UserCategoryCorrection = typeof userCategoryCorrection.$inferSelect;
-export type UserCategoryCorrectionInsert =
-  typeof userCategoryCorrection.$inferInsert;
-
-export type MccCategoryMapping = typeof mccCategoryMapping.$inferSelect;
-export type MccCategoryMappingInsert = typeof mccCategoryMapping.$inferInsert;
-
 // Export Zod schemas for validation
 export const userSelectSchema = createSelectSchema(user);
 export const userInsertSchema = createInsertSchema(user);
@@ -505,18 +367,3 @@ export const mainCategoryInsertSchema = createInsertSchema(mainCategory);
 
 export const subCategorySelectSchema = createSelectSchema(subCategory);
 export const subCategoryInsertSchema = createInsertSchema(subCategory);
-
-export const categoryRuleSelectSchema = createSelectSchema(categoryRule);
-export const categoryRuleInsertSchema = createInsertSchema(categoryRule);
-
-export const userCategoryCorrectionSelectSchema = createSelectSchema(
-  userCategoryCorrection
-);
-export const userCategoryCorrectionInsertSchema = createInsertSchema(
-  userCategoryCorrection
-);
-
-export const mccCategoryMappingSelectSchema =
-  createSelectSchema(mccCategoryMapping);
-export const mccCategoryMappingInsertSchema =
-  createInsertSchema(mccCategoryMapping);

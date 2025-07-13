@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { createDatabase } from "../db/db";
-import { mainCategory, subCategory, mccCategoryMapping } from "../db/schema";
+import { mainCategory, subCategory } from "../db/schema";
 
 /**
  * Seed script for main categories, subcategories, and MCC mappings
@@ -129,6 +129,13 @@ const mainCategories: MainCategoryDefinition[] = [
     icon: "TrendUp",
     color: "#22C55E",
     sortOrder: 15,
+  },
+  {
+    name: "To Classify",
+    description: "Transactions that need manual classification",
+    icon: "Question",
+    color: "#6B7280",
+    sortOrder: 16,
   },
 ];
 
@@ -1052,6 +1059,14 @@ const subCategories: SubCategoryDefinition[] = [
     icon: "Briefcase",
     sortOrder: 15,
   },
+  // To Classify
+  {
+    mainCategoryName: "To Classify",
+    name: "Needs Review",
+    description: "Transactions requiring manual classification",
+    icon: "Question",
+    sortOrder: 1,
+  },
 ];
 
 async function seedCategories() {
@@ -1062,7 +1077,6 @@ async function seedCategories() {
 
     // Clear existing data
     console.log("🧹 Clearing existing data...");
-    await db.delete(mccCategoryMapping);
     await db.delete(subCategory);
     await db.delete(mainCategory);
 

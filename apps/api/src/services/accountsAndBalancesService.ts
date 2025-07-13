@@ -123,6 +123,46 @@ export class AccountsAndBalancesService {
   }
 
   /**
+   * Fetch consent expiry data from provider consents
+   */
+  private async fetchConsentExpiryData(
+    userAccessToken: string,
+    credentialsId?: string
+  ): Promise<Date | null> {
+    try {
+      const { TinkService } = await import("./tinkService.js");
+      const tinkService = new TinkService();
+
+      const consentsResponse = await tinkService.listProviderConsents(
+        userAccessToken
+      );
+
+      if (
+        !consentsResponse.providerConsents ||
+        consentsResponse.providerConsents.length === 0
+      ) {
+        return null;
+      }
+
+      // Find consent matching the credentialsId
+      const matchingConsent = credentialsId
+        ? consentsResponse.providerConsents.find(
+            (consent) => consent.credentialsId === credentialsId
+          )
+        : consentsResponse.providerConsents[0]; // Use first consent if no credentialsId provided
+
+      if (matchingConsent?.sessionExpiryDate) {
+        return new Date(matchingConsent.sessionExpiryDate);
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Failed to fetch consent expiry data:", error);
+      return null;
+    }
+  }
+
+  /**
    * Decrypt sensitive account fields
    */
   private async decryptAccount(account: BankAccount): Promise<BankAccount> {
@@ -662,6 +702,12 @@ export class AccountsAndBalancesService {
       userAccessToken
     );
 
+    // Fetch consent expiry data
+    const consentExpiryDate = await this.fetchConsentExpiryData(
+      userAccessToken,
+      credentialsId || existingAccount.credentialsId || undefined
+    );
+
     const accountData = {
       accountName: tinkAccount.name,
       accountType: tinkAccount.type,
@@ -684,6 +730,7 @@ export class AccountsAndBalancesService {
       tokenExpiresAt: expiresIn
         ? new Date(Date.now() + expiresIn * 1000)
         : existingAccount.tokenExpiresAt,
+      consentExpiresAt: consentExpiryDate || existingAccount.consentExpiresAt,
       updatedAt: new Date(),
     };
 
@@ -721,6 +768,12 @@ export class AccountsAndBalancesService {
       userAccessToken
     );
 
+    // Fetch consent expiry data
+    const consentExpiryDate = await this.fetchConsentExpiryData(
+      userAccessToken,
+      credentialsId || undefined
+    );
+
     const accountData = {
       userId,
       tinkAccountId: tinkAccount.id,
@@ -744,6 +797,7 @@ export class AccountsAndBalancesService {
       tokenExpiresAt: expiresIn
         ? new Date(Date.now() + expiresIn * 1000)
         : new Date(Date.now() + 3600 * 1000),
+      consentExpiresAt: consentExpiryDate,
     };
 
     const inserted = await trx

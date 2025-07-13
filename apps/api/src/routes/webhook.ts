@@ -163,9 +163,10 @@ const webhookRoutes: FastifyPluginAsync = async (fastify) => {
       credentialsId: content.credentialsId,
       status: content.credentialsStatus,
       source: content.source,
+      sessionExpiryDate: content.sessionExpiryDate,
     });
 
-    // If refresh was successful, we might want to sync transactions
+    // If refresh was successful, update consent expiry data
     if (content.credentialsStatus === "UPDATED") {
       // Find user by external user ID
       const externalUserId = context.externalUserId;
@@ -180,34 +181,131 @@ const webhookRoutes: FastifyPluginAsync = async (fastify) => {
           if (userResult.length > 0) {
             const userId = userResult[0].id;
 
-            // Get user's bank accounts
+            // Get user's bank accounts with matching credentialsId
             const bankAccounts = await fastify.db
               .select()
               .from(bankAccount)
-              .where(eq(bankAccount.userId, userId));
+              .where(
+                and(
+                  eq(bankAccount.userId, userId),
+                  eq(bankAccount.credentialsId, content.credentialsId || "")
+                )
+              );
+
+            // Update consent expiry date if provided in webhook
+            if (content.sessionExpiryDate && bankAccounts.length > 0) {
+              const consentExpiryDate = new Date(content.sessionExpiryDate);
+              
+              // Update all accounts with this credentialsId
+              for (const account of bankAccounts) {
+                try {
+                  await fastify.db
+                    .update(bankAccount)
+                    .set({
+                      consentExpiresAt: consentExpiryDate,
+                      consentStatus: "ACTIVE", // Mark as active since refresh was successful
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(bankAccount.id, account.id));
+
+                  fastify.log.info("Updated consent expiry for account", {
+                    accountId: account.id,
+                    accountName: account.accountName,
+                    consentExpiryDate: consentExpiryDate.toISOString(),
+                  });
+                } catch (error) {
+                  fastify.log.error("Failed to update consent expiry for account", {
+                    error,
+                    accountId: account.id,
+                  });
+                }
+              }
+            }
 
             // Sync transactions for all accounts (background process)
             setImmediate(() => {
               void (async () => {
                 for (const account of bankAccounts) {
                   try {
-                    // TODO: Get user access token (you might need to implement token retrieval)
-                    // For now, we'll skip the sync as it requires user access token
-                    // Storing and retrieving user access tokens securely
-                    // Using the token refresh logic from tokenService
-                    // Implementing proper token management
-                    fastify.log.info(
-                      "Skipping transaction sync - user access token required",
-                      {
-                        accountId: account.tinkAccountId,
-                      }
+                    // Check if we have a valid access token and refresh if needed
+                    const { tokenService } = await import(
+                      "../services/tokenService.js"
                     );
+                    const tokenResult = await tokenService.refreshUserTokenIfNeeded(
+                      fastify.db,
+                      userId,
+                      account.tinkAccountId
+                    );
+
+                    if (tokenResult) {
+                      // Use the refreshed token for sync
+                      const refreshedAccount = tokenResult.account;
+
+                      fastify.log.info(
+                        "Starting webhook-triggered transaction sync after refresh",
+                        {
+                          accountId: account.tinkAccountId,
+                          userId,
+                          credentialsId: content.credentialsId,
+                        }
+                      );
+
+                      // Import transaction sync service
+                      const { TransactionSyncService } = await import(
+                        "../services/transaction/transactionSyncService.js"
+                      );
+                      const syncService = new TransactionSyncService();
+
+                      // Calculate date range for incremental sync (last 30 days to catch any updates)
+                      const thirtyDaysAgo = new Date();
+                      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                      
+                      const dateRange = {
+                        from: thirtyDaysAgo.toISOString().split("T")[0],
+                        to: new Date().toISOString().split("T")[0],
+                      };
+
+                      // Sync transactions for the account
+                      const syncResult =
+                        await syncService.syncTransactionsForDateRange(
+                          fastify.db,
+                          userId,
+                          account.tinkAccountId,
+                          refreshedAccount.accessToken!,
+                          dateRange
+                        );
+
+                      fastify.log.info(
+                        "Webhook-triggered transaction sync completed after refresh",
+                        {
+                          accountId: account.tinkAccountId,
+                          created: syncResult.transactionsCreated,
+                          updated: syncResult.transactionsUpdated,
+                          errors: syncResult.errors.length,
+                          totalFetched: syncResult.totalTransactionsFetched,
+                        }
+                      );
+                    } else {
+                      fastify.log.warn(
+                        "Cannot sync transactions after refresh - access token expired and could not be refreshed",
+                        {
+                          accountId: account.tinkAccountId,
+                          userId,
+                          hasToken: !!account.accessToken,
+                          tokenExpired: account.tokenExpiresAt
+                            ? account.tokenExpiresAt <= new Date()
+                            : true,
+                        }
+                      );
+                    }
                   } catch (error) {
                     fastify.log.error(
                       "Error syncing transactions after refresh",
                       {
                         error,
                         accountId: account.tinkAccountId,
+                        userId,
+                        credentialsId: content.credentialsId,
                       }
                     );
                   }

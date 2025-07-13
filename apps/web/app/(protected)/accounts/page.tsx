@@ -505,6 +505,42 @@ export default function AccountsPage() {
                           </span>
                         </div>
 
+                        {/* Session Expiry Information */}
+                        {account.consentExpiresAt && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground">
+                              Session Expires:
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {(() => {
+                                const expiryDate = new Date(account.consentExpiresAt);
+                                const now = new Date();
+                                const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                
+                                if (daysUntilExpiry < 0) {
+                                  return (
+                                    <span className="text-red-600 font-medium">
+                                      Expired {Math.abs(daysUntilExpiry)} days ago
+                                    </span>
+                                  );
+                                } else if (daysUntilExpiry <= 7) {
+                                  return (
+                                    <span className="text-orange-600 font-medium">
+                                      In {daysUntilExpiry} days
+                                    </span>
+                                  );
+                                } else {
+                                  return (
+                                    <span className="text-green-600">
+                                      {expiryDate.toLocaleDateString()}
+                                    </span>
+                                  );
+                                }
+                              })()}
+                            </span>
+                          </div>
+                        )}
+
                         {/* Consent Status */}
                         {account.credentialsId && (
                           <div className="flex justify-between items-center">

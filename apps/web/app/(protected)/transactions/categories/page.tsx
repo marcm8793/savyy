@@ -98,31 +98,6 @@ export default function CategoriesPage() {
   }, [stats]);
 
 
-  const getConfidenceColor = (confidence: string | number | null) => {
-    if (!confidence) return "text-gray-500";
-    const conf =
-      typeof confidence === "string" ? parseFloat(confidence) : confidence;
-    if (conf >= 0.9) return "text-green-600";
-    if (conf >= 0.7) return "text-yellow-600";
-    return "text-red-600";
-  };
-
-  const getSourceBadgeVariant = (source: string | null) => {
-    switch (source) {
-      case "user":
-        return "default";
-      case "tink":
-        return "secondary";
-      case "mcc":
-        return "outline";
-      case "merchant":
-        return "outline";
-      case "description":
-        return "outline";
-      default:
-        return "secondary";
-    }
-  };
 
   return (
     <SidebarProvider>
@@ -366,34 +341,10 @@ export default function CategoriesPage() {
                               )}
                             </TableCell>
                             <TableCell>
-                              {transaction.categorySource && (
-                                <Badge
-                                  variant={getSourceBadgeVariant(
-                                    transaction.categorySource
-                                  )}
-                                >
-                                  {transaction.categorySource}
-                                </Badge>
-                              )}
+                              <span className="text-muted-foreground text-sm">-</span>
                             </TableCell>
                             <TableCell>
-                              {transaction.categoryConfidence && (
-                                <span
-                                  className={getConfidenceColor(
-                                    transaction.categoryConfidence
-                                  )}
-                                >
-                                  {Math.round(
-                                    (typeof transaction.categoryConfidence ===
-                                    "string"
-                                      ? parseFloat(
-                                          transaction.categoryConfidence
-                                        )
-                                      : transaction.categoryConfidence) * 100
-                                  )}
-                                  %
-                                </span>
-                              )}
+                              <span className="text-muted-foreground text-sm">-</span>
                             </TableCell>
                             <TableCell className="text-right">
                               <span

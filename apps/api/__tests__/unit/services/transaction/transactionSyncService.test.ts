@@ -41,6 +41,16 @@ vi.mock("../../../../src/services/encryptionService", () => {
   };
 });
 
+// Mock the AI categorization service
+vi.mock("../../../../src/services/transaction/aiCategorizationService", () => {
+  return {
+    AICategorizationService: vi.fn().mockImplementation(() => ({
+      categorizeBatch: vi.fn().mockResolvedValue(new Map()),
+      invalidateCache: vi.fn(),
+    })),
+  };
+});
+
 // Mock the dependencies
 vi.mock("../../../../src/services/transaction/transactionFetchService");
 vi.mock("../../../../src/services/transaction/transactionStorageService");

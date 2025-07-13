@@ -2,7 +2,10 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, and, sql } from "drizzle-orm";
 import { schema, bankAccount, transaction } from "../../../db/schema";
 import { TinkTransaction, StorageResult } from "./types";
-import { AICategorizationService } from "./aiCategorizationService";
+import {
+  AICategorizationService,
+  CategorizationResult,
+} from "./aiCategorizationService";
 import { getEncryptionService } from "../encryptionService";
 import { encryptionResultToFields } from "../../types/encryption";
 
@@ -84,10 +87,18 @@ export class TransactionStorageService {
       try {
         await db.transaction(async (tx) => {
           // Categorize the batch before storage using AI
-          const categorizations = await this.aiCategorizationService.categorizeBatch(
-            tx,
-            batch
-          );
+          let categorizations: Map<string, CategorizationResult>;
+          try {
+            categorizations =
+              await this.aiCategorizationService.categorizeBatch(tx, batch);
+          } catch (error) {
+            console.error(
+              "AI categorization failed, using fallback categories:",
+              error
+            );
+            // Return empty map to trigger fallback for all transactions
+            categorizations = new Map();
+          }
 
           // Prepare batch data for bulk upsert with AI categorization
           const batchData = batch.map((tinkTx) => {
@@ -106,27 +117,23 @@ export class TransactionStorageService {
               amountScale: parseInt(tinkTx.amount.value.scale) || 0,
               currencyCode: tinkTx.amount.currencyCode,
               bookedDate: tinkTx.dates.booked,
-              valueDate:
-                tinkTx.dates.value || tinkTx.dates.booked,
+              valueDate: tinkTx.dates.value || tinkTx.dates.booked,
               status: tinkTx.status,
               originalStatus: tinkTx.status, // Store original status for new transactions
               statusLastUpdated: new Date(), // Always update status timestamp
-              displayDescription: (
-                tinkTx.descriptions.display ?? ""
-              ).substring(0, 500),
+              displayDescription: (tinkTx.descriptions.display ?? "").substring(
+                0,
+                500
+              ),
               originalDescription: (
                 tinkTx.descriptions.original ?? ""
               ).substring(0, 500),
               providerTransactionId:
-                tinkTx.identifiers?.providerTransactionId?.substring(
-                  0,
-                  255
-                ),
-              merchantName:
-                tinkTx.merchantInformation?.merchantName?.substring(
-                  0,
-                  255
-                ),
+                tinkTx.identifiers?.providerTransactionId?.substring(0, 255),
+              merchantName: tinkTx.merchantInformation?.merchantName?.substring(
+                0,
+                255
+              ),
               merchantCategoryCode:
                 tinkTx.merchantInformation?.merchantCategoryCode?.substring(
                   0,
@@ -135,10 +142,7 @@ export class TransactionStorageService {
 
               // Original Tink categories (preserved)
               categoryId: tinkTx.categories?.pfm?.id?.substring(0, 255),
-              categoryName: tinkTx.categories?.pfm?.name?.substring(
-                0,
-                255
-              ),
+              categoryName: tinkTx.categories?.pfm?.name?.substring(0, 255),
 
               // Simplified AI categorization
               mainCategory: categorization.mainCategory,
@@ -147,10 +151,7 @@ export class TransactionStorageService {
 
               transactionType: tinkTx.types?.type?.substring(0, 50),
               financialInstitutionTypeCode:
-                tinkTx.types?.financialInstitutionTypeCode?.substring(
-                  0,
-                  10
-                ),
+                tinkTx.types?.financialInstitutionTypeCode?.substring(0, 10),
               reference: tinkTx.reference?.substring(0, 255),
               createdAt: new Date(),
               updatedAt: new Date(),

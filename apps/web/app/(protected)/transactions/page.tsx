@@ -64,6 +64,8 @@ import { getCategoryIcon, getCategoryColor } from "@/lib/category-icons";
 // Use the transaction type but with serialized dates (as they come from tRPC)
 type Transaction = {
   id: string;
+  encryptionKeyId: string | null;
+  userId: string;
   tinkTransactionId: string;
   tinkAccountId: string;
   amount: string;
@@ -86,10 +88,6 @@ type Transaction = {
   subCategory: string | null;
   mainCategoryIcon: string | null;
   subCategoryIcon: string | null;
-  categorySource: string | null;
-  categoryConfidence: string | null;
-  needsReview: boolean | null;
-  categorizedAt: string | null;
 
   merchantName: string | null;
   merchantCategoryCode: string | null;
@@ -98,6 +96,7 @@ type Transaction = {
   payerName: string | null;
   createdAt: string;
   updatedAt: string;
+  bankAccountId: string;
 };
 
 export default function TransactionsPage() {
@@ -542,6 +541,9 @@ export default function TransactionsPage() {
                                       }
                                       currentSubCategory={
                                         transaction.subCategory
+                                      }
+                                      currentMainCategoryIcon={
+                                        transaction.mainCategoryIcon
                                       }
                                       currentSubCategoryIcon={
                                         transaction.subCategoryIcon

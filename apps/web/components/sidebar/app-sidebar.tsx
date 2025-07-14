@@ -2,7 +2,6 @@ import {
   BookOpen,
   Bot,
   Frame,
-  GalleryVerticalEnd,
   Map,
   PieChart,
   Settings2,
@@ -24,6 +23,7 @@ import {
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { useUserDisplayData } from "@/hooks/use-decrypted-user";
+import Image from "next/image";
 
 // This is sample data for navigation and projects - keeping this for non-user data
 const data = {
@@ -119,11 +119,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
                 <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <GalleryVerticalEnd className="size-4" />
+                  <Image
+                    src="/logo.svg"
+                    alt="Savyy Logo"
+                    width={32}
+                    height={32}
+                  />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
                   <span className="font-medium">Savyy</span>
-                  <span className="">Your money monitor</span>
+                  <span className="text-muted-foreground text-xs">
+                    Plan today, prosper tomorrow
+                  </span>
                 </div>
               </Link>
             </SidebarMenuButton>

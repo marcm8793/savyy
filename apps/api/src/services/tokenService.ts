@@ -26,7 +26,6 @@ export class TokenService {
     return now >= expiryWithBuffer;
   }
 
-
   /**
    * Automatically refresh user access token if expired
    * Returns a fresh token or the existing one if still valid
@@ -37,7 +36,6 @@ export class TokenService {
     tinkAccountId?: string
   ): Promise<{ accessToken: string; account: BankAccount } | null> {
     try {
-
       // Check current token validity
       const tokenCheck = await this.isUserTokenValid(db, userId, tinkAccountId);
 
@@ -88,13 +86,26 @@ export class TokenService {
           tokenCheck.account.credentialsId
         );
       } catch (refreshError) {
-        console.warn("Failed to refresh credentials, but continuing with token generation:", refreshError);
+        console.warn(
+          "Failed to refresh credentials, but continuing with token generation:",
+          {
+            error:
+              refreshError instanceof Error
+                ? refreshError.message
+                : String(refreshError),
+            credentialsId: tokenCheck.account.credentialsId,
+            userId,
+            accountId: tokenCheck.account.id,
+          }
+        );
       }
 
       // Generate new access token using the existing flow
       const freshTokenResponse = await tinkService.getUserAccessTokenFlow({
         tinkUserId: userId,
-        scope: tokenCheck.account.tokenScope || "accounts:read,balances:read,transactions:read,provider-consents:read,credentials:refresh",
+        scope:
+          tokenCheck.account.tokenScope ||
+          "accounts:read,balances:read,transactions:read,provider-consents:read,credentials:refresh",
       });
 
       // Calculate expiration time

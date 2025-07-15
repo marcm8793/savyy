@@ -114,10 +114,18 @@ export const optionalAuthMiddleware: FastifyPluginAsync = async (fastify) => {
     try {
       const session = await auth.api.getSession({
         headers: new Headers(
-          Object.entries(request.headers).map(([key, value]) => [
-            key,
-            Array.isArray(value) ? value.join(", ") : value || "",
-          ])
+          Object.entries(request.headers)
+            .filter(
+              (entry): entry is [string, string | string[]] =>
+                entry[1] !== undefined
+            )
+            .map(
+              ([k, v]) =>
+                [k, Array.isArray(v) ? v.join(", ") : String(v)] as [
+                  string,
+                  string
+                ]
+            )
         ),
       });
 

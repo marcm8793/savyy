@@ -91,20 +91,20 @@ curl -v -X POST https://api.tink.com/api/v1/oauth/token \
 ### Key Characteristics
 
 - Valid for 30 minutes (1800 seconds)
-- Includes a refresh token for obtaining new access tokens
+- Does not include a refresh token (must re-authenticate when expired)
 - Tied to specific user and their bank consents
 - Used for accessing user's financial data
 
 ## Key Differences
 
-| Aspect             | Client Access Token                         | User Access Token                         |
-| ------------------ | ------------------------------------------- | ----------------------------------------- |
-| **Authentication** | App-level (client_id + client_secret)       | User-level (via authorization code)       |
-| **Scope**          | Administrative operations                   | User data access                          |
-| **Refresh Token**  | No                                          | No                                        |
-| **Usage**          | Create users, manage webhooks, grant access | Fetch accounts, transactions, balances    |
-| **Security**       | Server-side only                            | Server-side only                          |
-| **Expiry**         | 30 minutes                                  | 30 minutes (renewable with refresh token) |
+| Aspect             | Client Access Token                         | User Access Token                                |
+| ------------------ | ------------------------------------------- | ------------------------------------------------ |
+| **Authentication** | App-level (client_id + client_secret)       | User-level (via authorization code)              |
+| **Scope**          | Administrative operations                   | User data access                                 |
+| **Refresh Token**  | No                                          | No                                               |
+| **Usage**          | Create users, manage webhooks, grant access | Fetch accounts, transactions, balances           |
+| **Security**       | Server-side only                            | Server-side only                                 |
+| **Expiry**         | 30 minutes                                  | 30 minutes (renewable with refresh access token) |
 
 ## Data Access Flow
 
@@ -120,7 +120,7 @@ The typical flow combines both token types:
 - Client access tokens must be kept secret and never exposed to public clients
 - User access tokens must be kept secret and never exposed to public clients
 - Both token types expire after 30 minutes for security
-- Use refresh tokens to renew user access tokens without re-authentication
+- Use the credentials:refresh scope and OAuth flow to renew user access tokens
 - Always use HTTPS when transmitting tokens
 
 ## Implementation in Savyy

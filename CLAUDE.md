@@ -161,6 +161,7 @@ npm run transaction:test-sync  # Test transaction sync functionality
 ### Token Types
 
 Client Access Tokens:
+
 - Authenticate your application (not individual users)
 - Used for administrative operations like creating users, managing webhooks, and granting authorizations
 - Require client_id and client_secret
@@ -168,10 +169,11 @@ Client Access Tokens:
 - Server-side only for security
 
 User Access Tokens:
+
 - Authenticate access to specific user's financial data
 - Used for fetching accounts, balances, and transactions
 - Obtained via authorization code flow after user bank authentication
-- Include refresh token for renewal
-- Valid for 30 minutes but renewable
+- Renewable via credentials refresh
+- Renewed by refreshing credentials and generating new access tokens
 
 The key difference is scope: client tokens handle app-level operations while user tokens access individual user's bank data after proper consent.

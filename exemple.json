@@ -1,0 +1,104 @@
+[
+  {
+    "transactions": [
+      {
+        "id": "3f3e701548c0408793fd2c00e81494a6",
+        "accountId": "9dc94de7fa8a496da4dea201a1bb9af0",
+        "amount": {
+          "value": {
+            "unscaledValue": "-87",
+            "scale": "2"
+          },
+          "currencyCode": "EUR"
+        },
+        "descriptions": {
+          "original": "T3 Chat",
+          "display": "T3 Chat",
+          "detailed": {
+            "unstructured": "T3 Chat"
+          }
+        },
+        "dates": {
+          "booked": "2025-07-12",
+          "value": "2025-07-13"
+        },
+        "identifiers": {
+          "providerTransactionId": "687264eb-77d9-a5f5-8cbf-8983a9a5876a"
+        },
+        "types": {
+          "type": "DEFAULT",
+          "financialInstitutionTypeCode": "CARD_PAYMENT"
+        },
+        "status": "BOOKED",
+        "merchantInformation": {
+          "merchantName": "T3 Chat"
+        },
+        "providerMutability": "MUTABILITY_UNDEFINED",
+        "bookedDateTime": "2025-07-12T13:36:43Z",
+        "valueDateTime": "2025-07-13T14:24:34Z",
+        "counterparties": {
+          "payer": {
+            "name": "JEAN-PIERRE JOSE",
+            "identifiers": {
+              "financialInstitution": {
+                "accountNumber": "0173"
+              }
+            }
+          },
+          "payee": {
+            "name": "T3 Chat"
+          }
+        }
+      },
+      {
+        "id": "f7221a6466b347e5bfec3e9b6d3d1267",
+        "accountId": "9dc94de7fa8a496da4dea201a1bb9af0",
+        "amount": {
+          "value": {
+            "unscaledValue": "-2346",
+            "scale": "2"
+          },
+          "currencyCode": "EUR"
+        },
+        "descriptions": {
+          "original": "Auchan Issy",
+          "display": "Auchan Issy",
+          "detailed": {
+            "unstructured": "Auchan Issy"
+          }
+        },
+        "dates": {
+          "booked": "2025-07-12",
+          "value": "2025-07-13"
+        },
+        "identifiers": {
+          "providerTransactionId": "68727550-a50b-aba8-915b-7f2326fd8197"
+        },
+        "types": {
+          "type": "DEFAULT",
+          "financialInstitutionTypeCode": "CARD_PAYMENT"
+        },
+        "status": "BOOKED",
+        "merchantInformation": {
+          "merchantName": "Auchan Issy     4786970"
+        },
+        "providerMutability": "MUTABILITY_UNDEFINED",
+        "bookedDateTime": "2025-07-12T14:46:40Z",
+        "valueDateTime": "2025-07-13T09:07:00Z",
+        "counterparties": {
+          "payer": {
+            "name": "JEAN-PIERRE JOSE",
+            "identifiers": {
+              "financialInstitution": {
+                "accountNumber": "0173"
+              }
+            }
+          },
+          "payee": {
+            "name": "Auchan Issy     4786970"
+          }
+        }
+      }
+    ]
+  }
+]

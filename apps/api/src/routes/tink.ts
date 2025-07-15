@@ -126,7 +126,7 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
             const tokenResponse = await tinkService.getUserAccessTokenFlow({
               tinkUserId: stateData.userId,
               scope:
-                "accounts:read,balances:read,transactions:read,provider-consents:read",
+                "accounts:read,balances:read,transactions:read,provider-consents:read,credentials:refresh",
             });
 
             // For now, we'll let the AccountsAndBalancesService handle consent refresh detection
@@ -442,7 +442,9 @@ const tinkRoutes: FastifyPluginAsync = async (fastify) => {
           user.id,
           tokenResponse.access_token,
           tokenResponse.scope,
-          tokenResponse.expires_in
+          tokenResponse.expires_in,
+          undefined, // credentialsId
+          undefined // options
         );
 
         return reply.send({

@@ -74,17 +74,6 @@ export const account = pgTable("account", {
   refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
   scope: text("scope"),
   password: text("password"),
-  // Encrypted fields
-  encryptedAccessToken: text("encrypted_access_token"),
-  encryptedAccessTokenIv: text("encrypted_access_token_iv"),
-  encryptedAccessTokenAuthTag: text("encrypted_access_token_auth_tag"),
-  encryptedRefreshToken: text("encrypted_refresh_token"),
-  encryptedRefreshTokenIv: text("encrypted_refresh_token_iv"),
-  encryptedRefreshTokenAuthTag: text("encrypted_refresh_token_auth_tag"),
-  encryptedIdToken: text("encrypted_id_token"),
-  encryptedIdTokenIv: text("encrypted_id_token_iv"),
-  encryptedIdTokenAuthTag: text("encrypted_id_token_auth_tag"),
-  encryptionKeyId: text("encryption_key_id"),
 
   // Timestamps
   createdAt: timestamp("created_at").notNull(),

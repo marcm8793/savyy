@@ -1,6 +1,5 @@
 export interface TinkTokenResponse {
   access_token: string;
-  refresh_token?: string;
   expires_in: number;
   token_type: string;
   scope: string;
@@ -368,18 +367,20 @@ export class TinkService {
       throw new Error("Either userId or tinkUserId must be provided");
     }
 
-    // Default scope for data access
+    // Default scope for data access - includes credentials:refresh for refresh tokens
     const defaultScope =
-      "accounts:read,balances:read,transactions:read,provider-consents:read";
+      "accounts:read,balances:read,transactions:read,provider-consents:read,credentials:refresh";
 
     const requestBody = new URLSearchParams({
       scope: options.scope || defaultScope,
     });
 
     // Add user identification (only one should be provided)
+    // For continuous access, we should use external_user_id with our internal user ID
     if (options.userId) {
       requestBody.append("user_id", options.userId);
     } else if (options.tinkUserId) {
+      // tinkUserId parameter actually contains our internal user ID for external_user_id
       requestBody.append("external_user_id", options.tinkUserId);
     }
 
@@ -460,7 +461,6 @@ export class TinkService {
     const tokenData = (await response.json()) as TinkTokenResponse;
     console.log("Tink user access token success:", {
       hasAccessToken: !!tokenData.access_token,
-      hasRefreshToken: !!tokenData.refresh_token,
       tokenType: tokenData.token_type,
       expiresIn: tokenData.expires_in,
       scope: tokenData.scope,
@@ -492,6 +492,9 @@ export class TinkService {
 
     return userToken;
   }
+
+  // Note: refreshAccessToken method removed as Tink doesn't provide refresh tokens reliably
+  // Use getUserAccessTokenFlow for token renewal instead
 
   //____________________________________________________________________________________
   //____________________________________________________________________________________

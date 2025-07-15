@@ -53,11 +53,11 @@
  * - Get session: GET /api/auth/get-session
  */
 
-import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
-import { auth } from '../utils/auth';
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import { auth } from "../utils/auth";
 
 // Extend Fastify request type to include user and session
-declare module 'fastify' {
+declare module "fastify" {
   interface FastifyRequest {
     user?: typeof auth.$Infer.Session.user;
     session?: typeof auth.$Infer.Session.session;
@@ -66,20 +66,30 @@ declare module 'fastify' {
 
 // Authentication middleware using better-auth
 export const authMiddleware: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook('preHandler', async (request, reply) => {
+  fastify.addHook("preHandler", async (request, reply) => {
     try {
       // Get session using better-auth
       const session = await auth.api.getSession({
-        headers: new Headers(Object.entries(request.headers).map(([key, value]) => [
-          key,
-          Array.isArray(value) ? value.join(', ') : value || ''
-        ])),
+        headers: new Headers(
+          Object.entries(request.headers)
+            .filter(
+              (entry): entry is [string, string | string[]] =>
+                entry[1] !== undefined
+            )
+            .map(
+              ([k, v]) =>
+                [k, Array.isArray(v) ? v.join(", ") : String(v)] as [
+                  string,
+                  string
+                ]
+            )
+        ),
       });
 
       if (!session) {
         reply.code(401).send({
-          error: 'Unauthorized',
-          message: 'No valid session found',
+          error: "Unauthorized",
+          message: "No valid session found",
         });
         return;
       }
@@ -88,10 +98,10 @@ export const authMiddleware: FastifyPluginAsync = async (fastify) => {
       request.user = session.user;
       request.session = session.session;
     } catch (error) {
-      fastify.log.error('Authentication error:', error);
+      fastify.log.error("Authentication error:", error);
       reply.code(401).send({
-        error: 'Authentication failed',
-        message: 'Invalid or expired session',
+        error: "Authentication failed",
+        message: "Invalid or expired session",
       });
       return;
     }
@@ -100,13 +110,15 @@ export const authMiddleware: FastifyPluginAsync = async (fastify) => {
 
 // Optional: Create a more flexible middleware that allows optional authentication
 export const optionalAuthMiddleware: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook('preHandler', async (request, _reply) => {
+  fastify.addHook("preHandler", async (request, _reply) => {
     try {
       const session = await auth.api.getSession({
-        headers: new Headers(Object.entries(request.headers).map(([key, value]) => [
-          key,
-          Array.isArray(value) ? value.join(', ') : value || ''
-        ])),
+        headers: new Headers(
+          Object.entries(request.headers).map(([key, value]) => [
+            key,
+            Array.isArray(value) ? value.join(", ") : value || "",
+          ])
+        ),
       });
 
       if (session) {
@@ -117,7 +129,7 @@ export const optionalAuthMiddleware: FastifyPluginAsync = async (fastify) => {
         request.session = undefined;
       }
     } catch (error) {
-      fastify.log.warn('Optional auth check failed:', error);
+      fastify.log.warn("Optional auth check failed:", error);
       request.user = undefined;
       request.session = undefined;
     }
@@ -127,12 +139,12 @@ export const optionalAuthMiddleware: FastifyPluginAsync = async (fastify) => {
 // Helper function to require authentication for specific routes
 export const requireAuth = async (
   request: FastifyRequest,
-  reply: FastifyReply,
+  reply: FastifyReply
 ) => {
   if (!request.user) {
     reply.code(401).send({
-      error: 'Unauthorized',
-      message: 'Authentication required for this endpoint',
+      error: "Unauthorized",
+      message: "Authentication required for this endpoint",
     });
     return;
   }

@@ -1,8 +1,22 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
-import { eq, and, gte, lte, inArray, desc, sql, getTableColumns } from "drizzle-orm";
-import { transaction, bankAccount, mainCategory, subCategory } from "../../db/schema";
+import {
+  eq,
+  and,
+  gte,
+  lte,
+  inArray,
+  desc,
+  sql,
+  getTableColumns,
+} from "drizzle-orm";
+import {
+  transaction,
+  bankAccount,
+  mainCategory,
+  subCategory,
+} from "../../db/schema";
 import { tinkService } from "../services/tinkService";
 import { TinkWebhookService } from "../services/tinkWebhookService";
 import { tokenService } from "../services/tokenService";
@@ -149,31 +163,16 @@ async function fetchTinkTransactions(
   return (await response.json()) as TinkTransactionsResponse;
 }
 
-// Refresh credentials data by generating a fresh user token with credentials:refresh scope
+// * Refresh credentials data using Tink's direct refresh endpoint
 async function refreshCredentialsData(
   credentialsId: string,
-  userId: string
+  userAccessToken: string
 ): Promise<void> {
-  console.log(
-    "Generating fresh user access token with credentials:refresh scope"
-  );
-
-  // Generate a fresh user access token with credentials:refresh scope
-  const freshUserToken = await tinkService.getUserAccessTokenFlow({
-    tinkUserId: userId,
-    scope:
-      "accounts:read,balances:read,transactions:read,credentials:refresh,credentials:read,credentials:write",
-  });
-
-  console.log("Fresh user token generated:", {
+  console.log("Refreshing credentials using direct refresh endpoint:", {
     credentialsId,
-    tokenType: freshUserToken.token_type,
-    scope: freshUserToken.scope,
-    hasToken: !!freshUserToken.access_token,
-    expiresIn: freshUserToken.expires_in,
+    hasToken: !!userAccessToken,
   });
 
-  // Use the fresh user token for refresh
   const baseUrl = process.env.TINK_API_URL || "https://api.tink.com";
 
   const response = await fetch(
@@ -181,22 +180,35 @@ async function refreshCredentialsData(
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${freshUserToken.access_token}`,
+        Authorization: `Bearer ${userAccessToken}`,
         "Content-Type": "application/json",
       },
     }
   );
 
+  console.log("Tink credentials refresh response:", {
+    credentialsId,
+    status: response.status,
+    statusText: response.statusText,
+  });
+
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `Failed to refresh credentials: ${response.status} ${errorText}`
-    );
+    console.error("Failed to refresh credentials:", {
+      credentialsId,
+      status: response.status,
+      error: errorText,
+    });
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Failed to refresh credentials: ${response.status} ${errorText}`,
+    });
   }
 
-  console.log(
-    `Credentials ${credentialsId} refreshed successfully with fresh user token`
-  );
+  console.log("Credentials refresh successful:", {
+    credentialsId,
+    status: response.status,
+  });
 }
 
 export const transactionRouter = router({
@@ -532,45 +544,31 @@ export const transactionRouter = router({
         );
 
         if (!tokenResult) {
-          // Check if this is a consent expiry or just a token refresh failure
-          const accountData = await db
-            .select()
-            .from(bankAccount)
-            .where(eq(bankAccount.id, bankAcc.id))
-            .limit(1);
-          
-          if (accountData.length > 0 && accountData[0].consentExpiresAt) {
-            const consentExpired = new Date(accountData[0].consentExpiresAt) <= new Date();
-            if (consentExpired) {
-              throw new TRPCError({
-                code: "UNAUTHORIZED",
-                message:
-                  "Your bank consent has expired and needs to be renewed. Please reconnect your bank account to continue accessing your financial data.",
-              });
-            }
-          }
-          
-          // Token refresh failed but consent might still be valid
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message:
-              "Unable to refresh access token. This may be temporary. If the issue persists, you may need to reconnect your bank account.",
+              "Unable to refresh access token. Please try again or reconnect your bank account if the issue persists.",
           });
         }
 
         // Update bankAcc with fresh token
         bankAcc = tokenResult.account;
 
+        console.log("Using refreshed token for credential refresh:", {
+          credentialsId: bankAcc.credentialsId,
+          hasToken: !!bankAcc.accessToken,
+          tokenScope: bankAcc.tokenScope,
+        });
+
         // Check provider consent status before attempting refresh
-        // Only check if the token has the required scope
-        const hasConsentScope = tokenResult.account.tokenScope?.includes(
+        const hasConsentScope = bankAcc.tokenScope?.includes(
           "provider-consents:read"
         );
 
         if (hasConsentScope) {
           try {
             const consent = await tinkService.getConsentByCredentialsId(
-              tokenResult.accessToken,
+              bankAcc.accessToken!,
               bankAcc.credentialsId!
             );
 
@@ -654,7 +652,10 @@ export const transactionRouter = router({
             message: "No credentials ID available after token refresh",
           });
         }
-        await refreshCredentialsData(bankAcc.credentialsId, user.id);
+        await refreshCredentialsData(
+          bankAcc.credentialsId,
+          bankAcc.accessToken!
+        );
 
         return {
           success: true,
@@ -979,15 +980,20 @@ export const transactionRouter = router({
           mainCategoryIcon: mainCategory.icon,
           subCategoryIcon: subCategory.icon,
           color: mainCategory.color,
-          sortOrder: sql`${mainCategory.sortOrder} * 1000 + ${subCategory.sortOrder}`.as('sortOrder'),
+          sortOrder:
+            sql`${mainCategory.sortOrder} * 1000 + ${subCategory.sortOrder}`.as(
+              "sortOrder"
+            ),
         })
         .from(subCategory)
-        .innerJoin(mainCategory, eq(subCategory.mainCategoryId, mainCategory.id))
-        .where(and(eq(mainCategory.isActive, true), eq(subCategory.isActive, true)))
-        .orderBy(
-          mainCategory.sortOrder,
-          subCategory.sortOrder
-        );
+        .innerJoin(
+          mainCategory,
+          eq(subCategory.mainCategoryId, mainCategory.id)
+        )
+        .where(
+          and(eq(mainCategory.isActive, true), eq(subCategory.isActive, true))
+        )
+        .orderBy(mainCategory.sortOrder, subCategory.sortOrder);
 
       // Group categories by main category for easier UI rendering
       const grouped = categories.reduce((acc, cat) => {
@@ -1009,7 +1015,7 @@ export const transactionRouter = router({
       }, {} as Record<string, { mainCategory: string; icon: string | null; color: string | null; subCategories: Array<{ id: string; subCategory: string; icon: string | null; color: string | null }> }>);
 
       return {
-        categories: categories.map(cat => ({
+        categories: categories.map((cat) => ({
           id: cat.id,
           mainCategory: cat.mainCategory,
           subCategory: cat.subCategory,
@@ -1068,7 +1074,10 @@ export const transactionRouter = router({
             subCategory: subCategory.name,
           })
           .from(subCategory)
-          .innerJoin(mainCategory, eq(subCategory.mainCategoryId, mainCategory.id))
+          .innerJoin(
+            mainCategory,
+            eq(subCategory.mainCategoryId, mainCategory.id)
+          )
           .where(
             and(
               eq(mainCategory.name, input.mainCategory),

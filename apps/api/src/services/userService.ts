@@ -125,17 +125,6 @@ export class UserService {
 
     return result[0];
   }
-
-  /**
-   * Update user's name and sync firstName/lastName
-   */
-  async updateUserName(
-    db: NodePgDatabase<typeof schema>,
-    userId: string,
-    name: string
-  ): Promise<User> {
-    return this.updateUserProfile(db, userId, { name });
-  }
 }
 
 export const userService = new UserService();

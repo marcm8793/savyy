@@ -26,59 +26,6 @@ export class TokenService {
     return now >= expiryWithBuffer;
   }
 
-  /**
-   * Check if user's Tink session is still valid
-   * Returns false immediately for known expired sessions to avoid unnecessary API calls
-   */
-  async checkTinkSessionValidity(userId: string): Promise<boolean> {
-    try {
-      // Import TinkService dynamically to avoid circular dependencies
-      const { TinkService } = await import("./tinkService.js");
-      const tinkService = new TinkService();
-
-      // Try to get authorization grant token and generate user auth code
-      const authToken = await tinkService.getAuthorizationGrantToken();
-      await tinkService.generateUserAuthorizationCode(authToken.access_token, {
-        tinkUserId: userId,
-        scope: "provider-consents:read", // Minimal scope for testing
-      });
-
-      return true; // If we get here, session is valid
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      // Check for various session expiration indicators
-      if (
-        errorMessage.includes("User ID does not exist") ||
-        errorMessage.includes("oauth.user_id_does_not_exist") ||
-        errorMessage.includes("SESSION_EXPIRED") ||
-        errorMessage.includes("AUTHENTICATION_ERROR") ||
-        errorMessage.includes("401") ||
-        errorMessage.includes("Unauthorized")
-      ) {
-        // 🔍 SESSION LIFESPAN LOGGING - SESSION EXPIRED
-        console.log("💀 TINK SESSION EXPIRED DETECTED:", {
-          userId,
-          expiredAt: new Date().toISOString(),
-          errorMessage,
-          errorType: "session_expired",
-          timestamp: Date.now(),
-          note: "This indicates the Tink user session has completely expired and requires full reconnection",
-        });
-
-        console.log("User's Tink session has expired, skipping further checks");
-        return false; // Session expired
-      }
-
-      // Other errors might be temporary, log them but assume session is invalid for safety
-      console.warn(
-        "Error checking Tink session validity, assuming invalid:",
-        errorMessage
-      );
-      return false;
-    }
-  }
 
   /**
    * Automatically refresh user access token if expired
@@ -90,8 +37,6 @@ export class TokenService {
     tinkAccountId?: string
   ): Promise<{ accessToken: string; account: BankAccount } | null> {
     try {
-      // Import TinkService dynamically to avoid circular dependencies
-      const { TinkService } = await import("./tinkService.js");
 
       // Check current token validity
       const tokenCheck = await this.isUserTokenValid(db, userId, tinkAccountId);
@@ -113,48 +58,43 @@ export class TokenService {
         userId,
         reason: tokenCheck.reason,
         expiresAt: tokenCheck.account.tokenExpiresAt,
+        accountId: tokenCheck.account.id,
       });
 
-      // Check if Tink session is still valid before attempting refresh
-      const sessionValid = await this.checkTinkSessionValidity(userId);
-      if (!sessionValid) {
-        console.log(
-          "User's Tink session has expired - automatic refresh not possible"
-        );
+      // Try to refresh credentials using access token and generate new token
+      if (!tokenCheck.account.credentialsId) {
+        console.error("No credentials ID available for account", {
+          userId,
+          accountId: tokenCheck.account.id,
+          accountName: tokenCheck.account.accountName,
+        });
         return null;
       }
 
-      // Generate fresh user access token with credentials:refresh scope
-      // Only request scopes that were originally granted, plus credentials:refresh
+      console.log("Attempting to refresh credentials using access token", {
+        userId,
+        accountId: tokenCheck.account.id,
+        credentialsId: tokenCheck.account.credentialsId,
+      });
+
+      // Import TinkService dynamically to avoid circular dependencies
+      const { TinkService } = await import("./tinkService.js");
       const tinkService = new TinkService();
-      const originalScope =
-        tokenCheck.account.tokenScope ||
-        "accounts:read,balances:read,transactions:read";
-      const baseScopes = originalScope.split(",").map((s) => s.trim());
 
-      // Always include credentials:refresh for token refresh capability
-      if (!baseScopes.includes("credentials:refresh")) {
-        baseScopes.push("credentials:refresh");
+      // First, try to refresh the credentials
+      try {
+        await tinkService.refreshCredentials(
+          tokenCheck.account.accessToken!,
+          tokenCheck.account.credentialsId
+        );
+      } catch (refreshError) {
+        console.warn("Failed to refresh credentials, but continuing with token generation:", refreshError);
       }
 
-      // Add credentials:read and credentials:write for full credential management
-      if (!baseScopes.includes("credentials:read")) {
-        baseScopes.push("credentials:read");
-      }
-      if (!baseScopes.includes("credentials:write")) {
-        baseScopes.push("credentials:write");
-      }
-
-      const refreshScope = baseScopes.join(",");
-
-      console.log(
-        "Generating fresh user access token with scope:",
-        refreshScope
-      );
-
+      // Generate new access token using the existing flow
       const freshTokenResponse = await tinkService.getUserAccessTokenFlow({
         tinkUserId: userId,
-        scope: refreshScope,
+        scope: tokenCheck.account.tokenScope || "accounts:read,balances:read,transactions:read,provider-consents:read,credentials:refresh",
       });
 
       // Calculate expiration time
@@ -184,23 +124,8 @@ export class TokenService {
         scope: freshTokenResponse.scope,
       });
 
-      // 🔍 SESSION LIFESPAN LOGGING - TOKEN REFRESHED (SESSION STILL ACTIVE)
-      console.log("🔄 TINK TOKEN REFRESHED (session still active):", {
-        userId,
-        tokenRefreshedAt: new Date().toISOString(),
-        newTokenExpiresAt: expiresAt.toISOString(),
-        tokenLifespanHours: Math.floor(freshTokenResponse.expires_in / 3600),
-        scope: freshTokenResponse.scope,
-        previousTokenExpiredAt:
-          tokenCheck.account.tokenExpiresAt?.toISOString(),
-        accountId: tokenCheck.account.id,
-        credentialsId: tokenCheck.account.credentialsId,
-        timestamp: Date.now(),
-        note: "Token was successfully refreshed - Tink session is still active and healthy",
-      });
-
       return {
-        accessToken: freshTokenResponse.access_token,
+        accessToken: updatedAccounts[0].accessToken!,
         account: updatedAccounts[0],
       };
     } catch (error) {
@@ -275,7 +200,7 @@ export class TokenService {
         return {
           isValid: false,
           account,
-          reason: `Token expired at ${account.tokenExpiresAt?.toISOString()}. User must reconnect their bank account.`,
+          reason: `Token expired at ${account.tokenExpiresAt?.toISOString()} and needs refresh.`,
         };
       }
 

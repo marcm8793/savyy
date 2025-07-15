@@ -242,11 +242,12 @@ curl -v -X POST https://api.tink.com/api/v1/oauth/token \
 {
   "access_token": "USER_ACCESS_TOKEN",
   "token_type": "bearer",
-  "expires_in": 1800,
-  "refresh_token": "REFRESH_TOKEN",
-  "scope": "accounts:read,balances:read,transactions:read"
+  "expires_in": 7200,
+  "scope": "accounts:read,balances:read,transactions:read,provider-consents:read,credentials:refresh"
 }
 ```
+
+**Note**: Tink does not reliably provide refresh tokens. For token renewal, use the `credentials:refresh` scope and generate new access tokens using the same authorization flow.
 
 The response includes the user access token.
 

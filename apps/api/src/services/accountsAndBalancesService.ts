@@ -583,6 +583,7 @@ export class AccountsAndBalancesService {
     expiresIn?: number,
     credentialsId?: string,
     options?: ConsentRefreshOptions
+    // Note: refreshToken parameter removed as Tink doesn't provide them reliably
   ): Promise<{ accounts: BankAccount[]; count: number; syncMode: SyncMode }> {
     console.log("Syncing accounts and balances for user:", userId, {
       credentialsId,
@@ -708,6 +709,7 @@ export class AccountsAndBalancesService {
     tokenScope?: string,
     expiresIn?: number,
     credentialsId?: string
+    // Note: refreshToken parameter removed
   ): Promise<BankAccount> {
     // Encrypt sensitive data
     const encryptedFields = await this.encryptAccountData(
@@ -734,6 +736,7 @@ export class AccountsAndBalancesService {
       // TODO: Keep plain fields for now (will be removed after migration)
       iban: tinkAccount.identifiers?.iban?.iban || existingAccount.iban,
       accessToken: userAccessToken,
+      // refreshToken: removed as not provided by Tink
       // Set encrypted fields
       ...encryptedFields,
       lastRefreshed: tinkAccount.dates?.lastRefreshed
@@ -774,6 +777,7 @@ export class AccountsAndBalancesService {
     tokenScope?: string,
     expiresIn?: number,
     credentialsId?: string
+    // Note: refreshToken parameter removed
   ): Promise<BankAccount> {
     // Encrypt sensitive data
     const encryptedFields = await this.encryptAccountData(
@@ -801,6 +805,7 @@ export class AccountsAndBalancesService {
       // TODO: Keep plain fields for now (will be removed after migration)
       iban: tinkAccount.identifiers?.iban?.iban || null,
       accessToken: userAccessToken,
+      // refreshToken: removed as not provided by Tink
       // Set encrypted fields
       ...encryptedFields,
       lastRefreshed: tinkAccount.dates?.lastRefreshed

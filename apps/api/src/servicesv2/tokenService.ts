@@ -111,7 +111,8 @@ export class TokenService {
         timestamp: payload.timestamp,
         nonce: payload.nonce,
       };
-    } catch {
+    } catch (error) {
+      console.error("State token verification error:", error);
       return null;
     }
   }

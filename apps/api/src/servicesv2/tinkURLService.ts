@@ -29,7 +29,8 @@ export class TinkURLService {
 
   constructor(config?: Partial<TinkURLConfig>) {
     this.clientId = config?.clientId || process.env.TINK_CLIENT_ID || "";
-    this.defaultRedirectUri = config?.redirectUri || process.env.TINK_REDIRECT_URI || "";
+    this.defaultRedirectUri =
+      config?.redirectUri || process.env.TINK_REDIRECT_URI || "";
     this.baseUrl = config?.baseUrl || "https://link.tink.com";
     this.tokenService = new TokenService();
 
@@ -42,7 +43,9 @@ export class TinkURLService {
     }
   }
 
-  buildConnectAccountsUrl(request: BuildTinkConnectUrlRequest): BuildTinkConnectUrlResponse {
+  buildConnectAccountsUrl(
+    request: BuildTinkConnectUrlRequest
+  ): BuildTinkConnectUrlResponse {
     const {
       authorizationCode,
       market,
@@ -50,7 +53,7 @@ export class TinkURLService {
       redirectUri,
       state,
       generateState = false,
-      userId
+      userId,
     } = request;
 
     if (!authorizationCode) {
@@ -70,7 +73,9 @@ export class TinkURLService {
 
     if (generateState && !state) {
       if (!userId) {
-        throw new Error("User ID is required for secure state token generation");
+        throw new Error(
+          "User ID is required for secure state token generation"
+        );
       }
       finalState = this.tokenService.createSecureStateToken(userId);
     }
@@ -80,14 +85,16 @@ export class TinkURLService {
       authorization_code: authorizationCode,
       redirect_uri: finalRedirectUri,
       market,
-      locale
+      locale,
     });
 
     if (finalState) {
       params.append("state", finalState);
     }
 
-    const url = `${this.baseUrl}/1.0/transactions/connect-accounts?${params.toString()}`;
+    const url = `${
+      this.baseUrl
+    }/1.0/transactions/connect-accounts?${params.toString()}`;
 
     console.log("Built Tink connect accounts URL:", {
       hasUrl: !!url,
@@ -95,12 +102,12 @@ export class TinkURLService {
       market,
       locale,
       clientId: this.clientId,
-      redirectUri: finalRedirectUri
+      redirectUri: finalRedirectUri,
     });
 
     return {
       url,
-      state: finalState
+      state: finalState,
     };
   }
 
@@ -122,7 +129,7 @@ export class TinkURLService {
       redirectUri,
       state,
       generateState = false,
-      userId
+      userId,
     } = request;
 
     if (!authorizationCode) {
@@ -142,7 +149,9 @@ export class TinkURLService {
 
     if (generateState && !state) {
       if (!userId) {
-        throw new Error("User ID is required for secure state token generation");
+        throw new Error(
+          "User ID is required for secure state token generation"
+        );
       }
       finalState = this.tokenService.createSecureStateToken(userId);
     }
@@ -152,7 +161,7 @@ export class TinkURLService {
       redirect_uri: finalRedirectUri,
       credentials_id: credentialsId,
       authorization_code: authorizationCode,
-      market
+      market,
     });
 
     if (locale) {
@@ -163,7 +172,9 @@ export class TinkURLService {
       params.append("state", finalState);
     }
 
-    const url = `${this.baseUrl}/1.0/transactions/update-consent?${params.toString()}`;
+    const url = `${
+      this.baseUrl
+    }/1.0/transactions/update-consent?${params.toString()}`;
 
     console.log("Built Tink update consent URL:", {
       hasUrl: !!url,
@@ -172,12 +183,12 @@ export class TinkURLService {
       locale,
       credentialsId,
       clientId: this.clientId,
-      redirectUri: finalRedirectUri
+      redirectUri: finalRedirectUri,
     });
 
     return {
       url,
-      state: finalState
+      state: finalState,
     };
   }
 
@@ -199,7 +210,7 @@ export class TinkURLService {
       redirectUri,
       state,
       generateState = false,
-      userId
+      userId,
     } = request;
 
     if (!authorizationCode) {
@@ -219,7 +230,9 @@ export class TinkURLService {
 
     if (generateState && !state) {
       if (!userId) {
-        throw new Error("User ID is required for secure state token generation");
+        throw new Error(
+          "User ID is required for secure state token generation"
+        );
       }
       finalState = this.tokenService.createSecureStateToken(userId);
     }
@@ -229,7 +242,7 @@ export class TinkURLService {
       redirect_uri: finalRedirectUri,
       credentials_id: credentialsId,
       authorization_code: authorizationCode,
-      market
+      market,
     });
 
     if (locale) {
@@ -240,7 +253,9 @@ export class TinkURLService {
       params.append("state", finalState);
     }
 
-    const url = `${this.baseUrl}/1.0/transactions/extend-consent?${params.toString()}`;
+    const url = `${
+      this.baseUrl
+    }/1.0/transactions/extend-consent?${params.toString()}`;
 
     console.log("Built Tink extend consent URL:", {
       hasUrl: !!url,
@@ -249,12 +264,12 @@ export class TinkURLService {
       locale,
       credentialsId,
       clientId: this.clientId,
-      redirectUri: finalRedirectUri
+      redirectUri: finalRedirectUri,
     });
 
     return {
       url,
-      state: finalState
+      state: finalState,
     };
   }
 }

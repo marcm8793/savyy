@@ -17,7 +17,7 @@ export const tinkUserRouter = router({
   createTinkUser: protectedProcedure
     .input(createUserSchema)
     .mutation(async ({ input, ctx }) => {
-      const { db } = createDatabase();
+      const { db, pool } = createDatabase();
       const oAuthService = new OAuthService();
       const tinkUserService = new TinkUserService();
 
@@ -36,8 +36,8 @@ export const tinkUserRouter = router({
         // Step 1: Get client access token with user:create scope
         console.log("Getting client access token for user creation...");
         const tokenResponse = await oAuthService.getClientAccessToken({
-          client_id: process.env.CLIENT_ID!,
-          client_secret: process.env.CLIENT_SECRET!,
+          client_id: process.env.CLIENT_ID || "",
+          client_secret: process.env.CLIENT_SECRET || "",
           grant_type: "client_credentials",
           scope: "user:create",
         });
@@ -78,6 +78,8 @@ export const tinkUserRouter = router({
         }
 
         throw new Error("Failed to create Tink user");
+      } finally {
+        await pool.end();
       }
     }),
 });

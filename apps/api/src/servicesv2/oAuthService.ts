@@ -49,10 +49,10 @@ export class OAuthService {
   constructor() {
     this.clientId = process.env.CLIENT_ID || "";
     this.clientSecret = process.env.CLIENT_SECRET || "";
-    this.baseUrl = process.env.BASE_URL || "";
+    this.baseUrl = process.env.TINK_API_URL || "";
     if (!this.clientId || !this.clientSecret || !this.baseUrl) {
       throw new Error(
-        "CLIENT_ID, CLIENT_SECRET, and BASE_URL environment variables are required"
+        "CLIENT_ID, CLIENT_SECRET, and TINK_API_URL environment variables are required"
       );
     }
   }
@@ -60,7 +60,7 @@ export class OAuthService {
   /**
    * Get an access token using various grant types
    * For client credentials: Uses client_id and client_secret with grant_type=client_credentials
-   * For authorization code: Uses client_id, client_secret, code with grant_type=authorization_code  
+   * For authorization code: Uses client_id, client_secret, code with grant_type=authorization_code
    * For JWT bearer: Uses client_id, assertion with grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer
    */
   async getClientAccessToken(
@@ -273,17 +273,14 @@ export class OAuthService {
       requestBody.append("external_user_id", request.external_user_id);
     }
 
-    const response = await fetch(
-      `${this.baseUrl}/api/v1/oauth/revoke-all`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${clientAccessToken}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: requestBody,
-      }
-    );
+    const response = await fetch(`${this.baseUrl}/api/v1/oauth/revoke-all`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${clientAccessToken}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: requestBody,
+    });
 
     if (!response.ok) {
       const errorText = await response.text();

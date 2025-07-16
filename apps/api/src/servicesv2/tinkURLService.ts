@@ -7,6 +7,7 @@ export interface BuildTinkConnectUrlRequest {
   redirectUri?: string;
   state?: string;
   generateState?: boolean;
+  userId?: string; // Required for secure state token generation
 }
 
 export interface BuildTinkConnectUrlResponse {
@@ -48,7 +49,8 @@ export class TinkURLService {
       locale,
       redirectUri,
       state,
-      generateState = false
+      generateState = false,
+      userId
     } = request;
 
     if (!authorizationCode) {
@@ -67,7 +69,10 @@ export class TinkURLService {
     let finalState = state;
 
     if (generateState && !state) {
-      finalState = this.tokenService.generateStateToken();
+      if (!userId) {
+        throw new Error("User ID is required for secure state token generation");
+      }
+      finalState = this.tokenService.createSecureStateToken(userId);
     }
 
     const params = new URLSearchParams({
@@ -107,6 +112,7 @@ export class TinkURLService {
     redirectUri?: string;
     state?: string;
     generateState?: boolean;
+    userId?: string; // Required for secure state token generation
   }): BuildTinkConnectUrlResponse {
     const {
       authorizationCode,
@@ -115,7 +121,8 @@ export class TinkURLService {
       locale,
       redirectUri,
       state,
-      generateState = false
+      generateState = false,
+      userId
     } = request;
 
     if (!authorizationCode) {
@@ -134,7 +141,10 @@ export class TinkURLService {
     let finalState = state;
 
     if (generateState && !state) {
-      finalState = this.tokenService.generateStateToken();
+      if (!userId) {
+        throw new Error("User ID is required for secure state token generation");
+      }
+      finalState = this.tokenService.createSecureStateToken(userId);
     }
 
     const params = new URLSearchParams({
@@ -179,6 +189,7 @@ export class TinkURLService {
     redirectUri?: string;
     state?: string;
     generateState?: boolean;
+    userId?: string; // Required for secure state token generation
   }): BuildTinkConnectUrlResponse {
     const {
       authorizationCode,
@@ -187,7 +198,8 @@ export class TinkURLService {
       locale,
       redirectUri,
       state,
-      generateState = false
+      generateState = false,
+      userId
     } = request;
 
     if (!authorizationCode) {
@@ -206,7 +218,10 @@ export class TinkURLService {
     let finalState = state;
 
     if (generateState && !state) {
-      finalState = this.tokenService.generateStateToken();
+      if (!userId) {
+        throw new Error("User ID is required for secure state token generation");
+      }
+      finalState = this.tokenService.createSecureStateToken(userId);
     }
 
     const params = new URLSearchParams({

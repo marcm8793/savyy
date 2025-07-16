@@ -7,6 +7,7 @@ import healthRoutes from "./routes/health";
 import protectedRoutes from "./routes/protected";
 import publicRoutes from "./routes/public";
 import tinkRoutes from "./routes/tink";
+import tinkRouteV2 from "./routesv2/tinkRoute";
 import webhookRoutes from "./routes/webhook";
 
 export async function createApp() {
@@ -54,6 +55,7 @@ export async function createApp() {
       await fastify.register(protectedRoutes);
       await fastify.register(publicRoutes);
       await fastify.register(tinkRoutes);
+      await fastify.register(tinkRouteV2);
       await fastify.register(webhookRoutes);
     } catch (error) {
       fastify.log.error("Failed to register routes:", error);

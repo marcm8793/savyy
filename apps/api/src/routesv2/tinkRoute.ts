@@ -15,14 +15,14 @@ const callbackQuerySchema = z.object({
 const tinkRoute: FastifyPluginAsync = async (fastify) => {
   // Initialize V2 TokenService
   const tokenService = new TokenService();
-  
+
   // Tink OAuth callback endpoint
   // This endpoint receives the callback from Tink after users complete bank authentication
   fastify.get("/api/tink/callback", async (request, reply) => {
     try {
       // Parse and validate query parameters
       const queryResult = callbackQuerySchema.safeParse(request.query);
-      
+
       if (!queryResult.success) {
         fastify.log.error(
           { err: queryResult.error },
@@ -32,7 +32,8 @@ const tinkRoute: FastifyPluginAsync = async (fastify) => {
         return reply.redirect(`${clientUrl}/accounts?error=invalid_parameters`);
       }
 
-      const { code, state, error, credentials_id, client_id } = queryResult.data;
+      const { code, state, error, credentials_id, client_id } =
+        queryResult.data;
 
       // Handle OAuth error responses
       if (error) {
@@ -56,7 +57,7 @@ const tinkRoute: FastifyPluginAsync = async (fastify) => {
 
       // Verify state token using existing token service
       const stateData = tokenService.verifySecureStateToken(state);
-      
+
       if (!stateData) {
         fastify.log.error("Invalid or expired state token", { state });
         const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
@@ -67,7 +68,7 @@ const tinkRoute: FastifyPluginAsync = async (fastify) => {
         userId: stateData.userId,
         timestamp: stateData.timestamp,
         hasCredentialsId: !!credentials_id,
-        hasClientId: !!client_id
+        hasClientId: !!client_id,
       });
 
       // Check if this authorization code has already been processed
@@ -77,7 +78,7 @@ const tinkRoute: FastifyPluginAsync = async (fastify) => {
           "Authorization code already processed, redirecting to error",
           {
             code: code.substring(0, 8) + "...",
-            userId: stateData.userId
+            userId: stateData.userId,
           }
         );
         const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
@@ -102,40 +103,52 @@ const tinkRoute: FastifyPluginAsync = async (fastify) => {
           "Authorization code is being processed by another instance, redirecting to error",
           {
             code: code.substring(0, 8) + "...",
-            userId: stateData.userId
+            userId: stateData.userId,
           }
         );
         const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
-        return reply.redirect(`${clientUrl}/accounts?error=concurrent_processing`);
+        return reply.redirect(
+          `${clientUrl}/accounts?error=concurrent_processing`
+        );
       }
 
       try {
         // Mark the code as successfully processed
         await redisService.markCodeAsCompleted(code);
-        
+
         fastify.log.info("Tink callback processed successfully", {
           userId: stateData.userId,
           credentialsId: credentials_id,
           clientId: client_id,
-          codePrefix: code.substring(0, 8) + "..."
+          codePrefix: code.substring(0, 8) + "...",
         });
 
         // Redirect to frontend with success status
         const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
         return reply.redirect(`${clientUrl}/accounts?connected=true`);
-
       } catch (processingError) {
         fastify.log.error(
-          { err: processingError instanceof Error ? processingError : new Error(String(processingError)), userId: stateData.userId },
+          {
+            err:
+              processingError instanceof Error
+                ? processingError
+                : new Error(String(processingError)),
+            userId: stateData.userId,
+          },
           "Error processing Tink callback"
         );
-        
+
         // Clear the processing lock on error
         try {
           await redisService.removeFromProcessing(code);
         } catch (clearError) {
           fastify.log.warn(
-            { err: clearError instanceof Error ? clearError : new Error(String(clearError)) },
+            {
+              err:
+                clearError instanceof Error
+                  ? clearError
+                  : new Error(String(clearError)),
+            },
             "Failed to clear processing lock after error"
           );
         }
@@ -143,7 +156,6 @@ const tinkRoute: FastifyPluginAsync = async (fastify) => {
         const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
         return reply.redirect(`${clientUrl}/accounts?error=processing_failed`);
       }
-
     } catch (error) {
       fastify.log.error({ err: error }, "Unexpected error in Tink callback");
       const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";

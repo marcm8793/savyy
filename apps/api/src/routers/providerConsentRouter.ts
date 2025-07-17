@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { bankAccount } from "../../db/schema";
 import { tinkService } from "../services/tinkService";
 import { tokenService } from "../services/tokenService";
@@ -12,12 +12,6 @@ const listConsentsSchema = z.object({
 });
 
 const updateConsentSchema = z.object({
-  credentialsId: z.string(),
-  market: z.string().default("FR"),
-  locale: z.string().default("en_US"),
-});
-
-const extendConsentSchema = z.object({
   credentialsId: z.string(),
   market: z.string().default("FR"),
   locale: z.string().default("en_US"),
@@ -189,91 +183,6 @@ export const providerConsentRouter = router({
       }
     }),
 
-  // Get specific consent by credentials ID
-  getByCredentialsId: protectedProcedure
-    .input(z.object({ credentialsId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      try {
-        const { db, user } = ctx;
-
-        // Get user's bank account with the specific credentials ID
-        const accounts = await db
-          .select()
-          .from(bankAccount)
-          .where(
-            and(
-              eq(bankAccount.userId, user.id),
-              eq(bankAccount.credentialsId, input.credentialsId)
-            )
-          )
-          .limit(1);
-
-        if (accounts.length === 0) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Bank account not found for the provided credentials ID",
-          });
-        }
-
-        const account = accounts[0];
-
-        if (!account.accessToken) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "No access token available for this account",
-          });
-        }
-
-        // Try to refresh token if needed
-        const tokenResult = await tokenService.refreshUserTokenIfNeeded(
-          db,
-          user.id,
-          account.tinkAccountId
-        );
-
-        if (!tokenResult) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message:
-              "Access token has expired. Please reconnect your bank account.",
-          });
-        }
-
-        // Get specific consent
-        const consent = await tinkService.getConsentByCredentialsId(
-          tokenResult.accessToken,
-          input.credentialsId
-        );
-
-        if (!consent) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message:
-              "Provider consent not found for the provided credentials ID",
-          });
-        }
-
-        return {
-          ...consent,
-          needsUpdate: tinkService.isConsentUpdateNeeded(consent),
-          sessionExpiryDateFormatted: new Date(
-            consent.sessionExpiryDate
-          ).toISOString(),
-          statusUpdatedFormatted: new Date(consent.statusUpdated).toISOString(),
-        };
-      } catch (error: unknown) {
-        if (error instanceof TRPCError) {
-          throw error;
-        }
-
-        console.error("Error getting provider consent:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to get provider consent",
-        });
-      }
-    }),
-
   // Generate URL for updating a consent
   getUpdateConsentUrl: protectedProcedure
     .input(updateConsentSchema)
@@ -316,53 +225,6 @@ export const providerConsentRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to generate update consent URL",
-        });
-      }
-    }),
-
-  // Generate URL for extending a consent
-  // TODO: refactor significant code duplication with getUpdateConsentUrl.
-  getExtendConsentUrl: protectedProcedure
-    .input(extendConsentSchema)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const { user } = ctx;
-
-        // Generate authorization code for the user
-        const authToken = await tinkService.getAuthorizationGrantToken();
-        const authCodeResponse =
-          await tinkService.generateUserAuthorizationCode(
-            authToken.access_token,
-            {
-              tinkUserId: user.id,
-              scope:
-                "authorization:read,authorization:grant,credentials:refresh,credentials:read,credentials:write,providers:read,user:read",
-            }
-          );
-
-        // Generate secure state parameter
-        const state = tokenService.createSecureStateToken(user.id);
-
-        // Build extend consent URL
-        const extendUrl = tinkService.buildExtendConsentUrl(
-          authCodeResponse.code,
-          input.credentialsId,
-          {
-            market: input.market,
-            locale: input.locale,
-            state,
-          }
-        );
-
-        return {
-          url: extendUrl,
-          message: "Redirect user to this URL to extend their bank consent",
-        };
-      } catch (error: unknown) {
-        console.error("Error generating extend consent URL:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to generate extend consent URL",
         });
       }
     }),

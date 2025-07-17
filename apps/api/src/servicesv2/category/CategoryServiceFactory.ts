@@ -13,10 +13,10 @@ import {
  * Factory for creating Category Microservices
  * 
  * Provides centralized service creation with proper dependency injection
- * and configuration management.
+ * and configuration management. Thread-safe with no static state manipulation.
  */
 export class CategoryServiceFactory {
-  private static logger: Logger = new ConsoleLogger();
+  private static defaultLogger: Logger = new ConsoleLogger();
 
   /**
    * Creates a complete transaction categorization service with all dependencies
@@ -26,9 +26,10 @@ export class CategoryServiceFactory {
       aiConfig?: Partial<AIServiceConfig>;
       categoryConfig?: Partial<CategoryServiceConfig>;
       transactionConfig?: Partial<TransactionCategorizationConfig>;
-    }
+    },
+    logger?: Logger
   ): TransactionCategorizationService {
-    const logger = this.logger;
+    const serviceLogger = logger || this.defaultLogger;
 
     // Create AI service configuration
     const aiConfig: AIServiceConfig = {
@@ -55,13 +56,13 @@ export class CategoryServiceFactory {
     };
 
     // Create services
-    const categoryService = new CategoryService(categoryConfig, logger);
-    const aiService = new AIService(aiConfig, logger);
+    const categoryService = new CategoryService(categoryConfig, serviceLogger);
+    const aiService = new AIService(aiConfig, serviceLogger);
     const transactionCategorizationService = new TransactionCategorizationService(
       categoryService,
       aiService,
       transactionConfig,
-      logger
+      serviceLogger
     );
 
     return transactionCategorizationService;
@@ -71,21 +72,23 @@ export class CategoryServiceFactory {
    * Creates just the category service
    */
   static createCategoryService(
-    config?: Partial<CategoryServiceConfig>
+    config?: Partial<CategoryServiceConfig>,
+    logger?: Logger
   ): CategoryService {
     const categoryConfig: CategoryServiceConfig = {
       cacheTimeToLive: 5 * 60 * 1000, // 5 minutes
       ...config,
     };
 
-    return new CategoryService(categoryConfig, this.logger);
+    return new CategoryService(categoryConfig, logger || this.defaultLogger);
   }
 
   /**
    * Creates just the AI service
    */
   static createAIService(
-    config?: Partial<AIServiceConfig>
+    config?: Partial<AIServiceConfig>,
+    logger?: Logger
   ): AIService {
     const aiConfig: AIServiceConfig = {
       apiKey: process.env.AI_API_KEY || "",
@@ -97,18 +100,11 @@ export class CategoryServiceFactory {
       ...config,
     };
 
-    return new AIService(aiConfig, this.logger);
+    return new AIService(aiConfig, logger || this.defaultLogger);
   }
 
   /**
-   * Sets a custom logger for all services
-   */
-  static setLogger(logger: Logger): void {
-    this.logger = logger;
-  }
-
-  /**
-   * Creates services with custom logger
+   * Creates services with custom logger (thread-safe)
    */
   static createServicesWithLogger(
     logger: Logger,
@@ -122,15 +118,10 @@ export class CategoryServiceFactory {
     aiService: AIService;
     transactionCategorizationService: TransactionCategorizationService;
   } {
-    const originalLogger = this.logger;
-    this.setLogger(logger);
-
-    const categoryService = this.createCategoryService(configs?.categoryConfig);
-    const aiService = this.createAIService(configs?.aiConfig);
-    const transactionCategorizationService = this.createTransactionCategorizationService(configs);
-
-    // Restore original logger
-    this.setLogger(originalLogger);
+    // Direct logger passing - no static state manipulation
+    const categoryService = this.createCategoryService(configs?.categoryConfig, logger);
+    const aiService = this.createAIService(configs?.aiConfig, logger);
+    const transactionCategorizationService = this.createTransactionCategorizationService(configs, logger);
 
     return {
       categoryService,

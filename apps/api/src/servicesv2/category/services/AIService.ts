@@ -1,17 +1,17 @@
 import { IAIService } from "../interfaces/IAIService";
-import { 
-  AnonymizedTransaction, 
-  CategorizationResult, 
+import {
+  AnonymizedTransaction,
+  CategorizationResult,
   CategoryStructure,
   AIApiResponse,
   AIRequestPayload,
   AIServiceConfig,
-  Logger 
+  Logger,
 } from "../types";
 
 /**
  * AI Service for Transaction Categorization
- * 
+ *
  * Handles all AI-related operations including API communication,
  * prompt generation, and response parsing with validation.
  */
@@ -24,7 +24,7 @@ export class AIService implements IAIService {
   constructor(config: AIServiceConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
-    
+
     if (!this.validateConfiguration()) {
       throw new Error("Invalid AI service configuration");
     }
@@ -45,7 +45,9 @@ export class AIService implements IAIService {
     categories: CategoryStructure[]
   ): Promise<CategorizationResult[]> {
     if (transactions.length === 0) {
-      this.logger.warn("Empty transaction batch provided for AI classification");
+      this.logger.warn(
+        "Empty transaction batch provided for AI classification"
+      );
       return [];
     }
 
@@ -62,31 +64,38 @@ export class AIService implements IAIService {
 
       // Call AI API
       const apiResponse = await this.callAIApi(systemPrompt, userPrompt);
-      
+
       // Parse and validate response
       const content = apiResponse.content?.[0]?.text;
       if (!content) {
         throw new Error("No content received from AI API");
       }
 
-      const results = this.parseResponse(content, transactions.length, categories);
-      
+      const results = this.parseResponse(
+        content,
+        transactions.length,
+        categories
+      );
+
       // Update success metrics
       this.lastSuccessfulCall = new Date();
       this.consecutiveFailures = 0;
-      
+
       const processingTime = Date.now() - startTime;
       this.logger.info("AI classification completed successfully", {
         transactionCount: transactions.length,
         processingTimeMs: processingTime,
-        successfulClassifications: results.filter(r => r.mainCategory !== "To Classify").length,
+        successfulClassifications: results.filter(
+          (r) => r.mainCategory !== "To Classify"
+        ).length,
       });
 
       return results;
     } catch (error) {
       this.consecutiveFailures++;
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
       this.logger.error("AI classification failed", {
         error: errorMessage,
         transactionCount: transactions.length,
@@ -176,12 +185,12 @@ Return a JSON array with exactly ${transactions.length} categorization results i
           expected: expectedCount,
           received: parsed.length,
         });
-        
+
         // If we got fewer results than expected, fill with fallback
         while (parsed.length < expectedCount) {
           parsed.push({});
         }
-        
+
         // If we got more results than expected, truncate
         if (parsed.length > expectedCount) {
           parsed.splice(expectedCount);
@@ -219,7 +228,8 @@ Return a JSON array with exactly ${transactions.length} categorization results i
         }
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       this.logger.error("Error parsing AI response", {
         error: errorMessage,
         expectedCount,
@@ -238,7 +248,10 @@ Return a JSON array with exactly ${transactions.length} categorization results i
   /**
    * Makes a direct API call to the AI service
    */
-  async callAIApi(systemPrompt: string, userPrompt: string): Promise<AIApiResponse> {
+  async callAIApi(
+    systemPrompt: string,
+    userPrompt: string
+  ): Promise<AIApiResponse> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
@@ -278,11 +291,11 @@ Return a JSON array with exactly ${transactions.length} categorization results i
       return (await response.json()) as AIApiResponse;
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error(`AI API timeout after ${this.config.timeout}ms`);
       }
-      
+
       throw error;
     }
   }
@@ -299,13 +312,17 @@ Return a JSON array with exactly ${transactions.length} categorization results i
 
     for (const { field, value } of requiredFields) {
       if (!value || typeof value !== "string" || value.trim() === "") {
-        this.logger.error(`Invalid AI service configuration: ${field} is required`);
+        this.logger.error(
+          `Invalid AI service configuration: ${field} is required`
+        );
         return false;
       }
     }
 
     if (this.config.timeout <= 0) {
-      this.logger.error("Invalid AI service configuration: timeout must be positive");
+      this.logger.error(
+        "Invalid AI service configuration: timeout must be positive"
+      );
       return false;
     }
 
@@ -352,9 +369,7 @@ Return a JSON array with exactly ${transactions.length} categorization results i
     }
 
     // Find the main category
-    const mainCat = categories.find(
-      (cat) => cat.mainCategory === mainCategory
-    );
+    const mainCat = categories.find((cat) => cat.mainCategory === mainCategory);
 
     if (!mainCat) {
       return false;

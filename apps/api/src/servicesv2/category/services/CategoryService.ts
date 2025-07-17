@@ -5,11 +5,16 @@ import {
   subCategory as subCategoryTable,
 } from "../../../../db/schema";
 import { ICategoryService } from "../interfaces/ICategoryService";
-import { CategoryStructure, CategoryServiceConfig, Logger, CategorizationResult } from "../types";
+import {
+  CategoryStructure,
+  CategoryServiceConfig,
+  Logger,
+  CategorizationResult,
+} from "../types";
 
 /**
  * Category Management Service
- * 
+ *
  * Handles category data retrieval, caching, and validation.
  * Implements efficient caching with TTL and provides category validation.
  */
@@ -34,20 +39,25 @@ export class CategoryService implements ICategoryService {
   /**
    * Retrieves all categories from the database with caching
    */
-  async getCategories(db: NodePgDatabase<typeof schema>): Promise<CategoryStructure[]> {
+  async getCategories(
+    db: NodePgDatabase<typeof schema>
+  ): Promise<CategoryStructure[]> {
     // Check cache first
     if (this.isCacheValid()) {
       this.logger.info("Returning categories from cache", {
         categoryCount: this.categoryCache?.length || 0,
       });
-      return this.categoryCache!;
+      return this.categoryCache || [];
     }
 
     try {
       // Fetch categories from database
       const startTime = Date.now();
       const [mainCategories, subCategories] = await Promise.all([
-        db.select().from(mainCategoryTable).orderBy(mainCategoryTable.sortOrder),
+        db
+          .select()
+          .from(mainCategoryTable)
+          .orderBy(mainCategoryTable.sortOrder),
         db.select().from(subCategoryTable).orderBy(subCategoryTable.sortOrder),
       ]);
 
@@ -103,7 +113,8 @@ export class CategoryService implements ICategoryService {
 
       return this.categoryCache;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       this.logger.error("Failed to fetch categories from database", {
         error: errorMessage,
       });
@@ -135,14 +146,14 @@ export class CategoryService implements ICategoryService {
     if (!mainCat) {
       this.logger.warn("Invalid main category", {
         mainCategory,
-        availableCategories: this.categoryCache.map(c => c.mainCategory),
+        availableCategories: this.categoryCache.map((c) => c.mainCategory),
       });
       return false;
     }
 
     // Check if subcategory exists under this main category
     const isValid = mainCat.subcategories.includes(subCategory);
-    
+
     if (!isValid) {
       this.logger.warn("Invalid subcategory for main category", {
         mainCategory,
@@ -180,8 +191,8 @@ export class CategoryService implements ICategoryService {
    */
   isCacheValid(): boolean {
     return (
-      this.categoryCache !== null && 
-      this.categoryCache.length > 0 && 
+      this.categoryCache !== null &&
+      this.categoryCache.length > 0 &&
       Date.now() < this.cacheExpiry
     );
   }

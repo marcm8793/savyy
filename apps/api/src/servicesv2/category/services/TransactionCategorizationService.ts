@@ -4,18 +4,18 @@ import { TinkTransaction } from "../../../services/transaction/types";
 import { ITransactionProcessor } from "../interfaces/ITransactionProcessor";
 import { ICategoryService } from "../interfaces/ICategoryService";
 import { IAIService } from "../interfaces/IAIService";
-import { 
-  AnonymizedTransaction, 
-  CategorizationResult, 
+import {
+  AnonymizedTransaction,
+  CategorizationResult,
   BatchProcessingResult,
   TransactionCategorizationConfig,
-  Logger 
+  Logger,
 } from "../types";
 import crypto from "crypto";
 
 /**
  * Transaction Categorization Service
- * 
+ *
  * Orchestrates the transaction categorization process by coordinating
  * between CategoryService and AIService. Handles transaction anonymization,
  * batch processing, and result mapping.
@@ -75,7 +75,7 @@ export class TransactionCategorizationService implements ITransactionProcessor {
     try {
       // Get available categories from database
       const categories = await this.categoryService.getCategories(db);
-      
+
       if (categories.length === 0) {
         this.logger.error("No categories available for classification");
         // Return fallback for all transactions
@@ -109,7 +109,8 @@ export class TransactionCategorizationService implements ITransactionProcessor {
 
       return batchResults.results;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       this.logger.error("Batch categorization failed", {
         error: errorMessage,
         transactionCount: transactions.length,
@@ -126,7 +127,12 @@ export class TransactionCategorizationService implements ITransactionProcessor {
       });
 
       // Update error statistics
-      this.updateStats(transactions.length, 0, transactions.length, Date.now() - startTime);
+      this.updateStats(
+        transactions.length,
+        0,
+        transactions.length,
+        Date.now() - startTime
+      );
 
       return results;
     }
@@ -150,11 +156,13 @@ export class TransactionCategorizationService implements ITransactionProcessor {
     // Process transactions in batches
     for (let i = 0; i < transactions.length; i += batchSize) {
       const batch = transactions.slice(i, i + batchSize);
-      
+
       try {
         // Validate transactions in batch
-        const validTransactions = batch.filter(tx => this.validateTransaction(tx));
-        
+        const validTransactions = batch.filter((tx) =>
+          this.validateTransaction(tx)
+        );
+
         if (validTransactions.length === 0) {
           this.logger.warn("No valid transactions in batch", {
             batchIndex: Math.floor(i / batchSize),
@@ -164,7 +172,7 @@ export class TransactionCategorizationService implements ITransactionProcessor {
         }
 
         // Anonymize transactions for AI processing
-        const anonymizedTransactions = validTransactions.map(tx => 
+        const anonymizedTransactions = validTransactions.map((tx) =>
           this.anonymizeTransaction(tx)
         );
 
@@ -186,12 +194,16 @@ export class TransactionCategorizationService implements ITransactionProcessor {
         this.logger.info("Batch processed successfully", {
           batchIndex: Math.floor(i / batchSize),
           batchSize: validTransactions.length,
-          successfulClassifications: batchResults.filter(r => r.mainCategory !== "To Classify").length,
+          successfulClassifications: batchResults.filter(
+            (r) => r.mainCategory !== "To Classify"
+          ).length,
         });
-
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        const batchError = `Batch ${Math.floor(i / batchSize)}: ${errorMessage}`;
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        const batchError = `Batch ${Math.floor(
+          i / batchSize
+        )}: ${errorMessage}`;
         errors.push(batchError);
 
         this.logger.error("Batch processing failed", {
@@ -223,14 +235,14 @@ export class TransactionCategorizationService implements ITransactionProcessor {
    */
   anonymizeTransaction(transaction: TinkTransaction): AnonymizedTransaction {
     // Create merchant hash
-    const merchantData = 
+    const merchantData =
       transaction.merchantInformation?.merchantName ||
       transaction.descriptions?.display ||
       "unknown";
     const merchantHash = this.createMerchantHash(merchantData);
 
     // Sanitize description
-    const rawDescription = 
+    const rawDescription =
       transaction.descriptions?.display ||
       transaction.descriptions?.original ||
       "";
@@ -243,8 +255,10 @@ export class TransactionCategorizationService implements ITransactionProcessor {
     );
 
     // Determine transaction type
-    const transactionType = 
-      parseFloat(transaction.amount.value.unscaledValue) >= 0 ? "credit" : "debit";
+    const transactionType =
+      parseFloat(transaction.amount.value.unscaledValue) >= 0
+        ? "credit"
+        : "debit";
 
     return {
       merchantHash,
@@ -264,9 +278,11 @@ export class TransactionCategorizationService implements ITransactionProcessor {
     }
 
     // Check amount structure
-    if (!transaction.amount.value || 
-        !transaction.amount.value.unscaledValue || 
-        !transaction.amount.currencyCode) {
+    if (
+      !transaction.amount.value ||
+      !transaction.amount.value.unscaledValue ||
+      !transaction.amount.currencyCode
+    ) {
       return false;
     }
 
@@ -299,7 +315,7 @@ export class TransactionCategorizationService implements ITransactionProcessor {
 
     // Remove potential credit card patterns
     sanitized = sanitized.replace(
-      /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g,
+      /\b(?:\d{4}[\s-]?){3}\d{4}\b|\b\d{13,19}\b/g,
       "[CARD]"
     );
 
@@ -343,9 +359,11 @@ export class TransactionCategorizationService implements ITransactionProcessor {
     averageProcessingTime: number;
     lastProcessedAt: Date | null;
   } {
-    const averageProcessingTime = this.stats.processingTimes.length > 0
-      ? this.stats.processingTimes.reduce((a, b) => a + b, 0) / this.stats.processingTimes.length
-      : 0;
+    const averageProcessingTime =
+      this.stats.processingTimes.length > 0
+        ? this.stats.processingTimes.reduce((a, b) => a + b, 0) /
+          this.stats.processingTimes.length
+        : 0;
 
     return {
       totalProcessed: this.stats.totalProcessed,

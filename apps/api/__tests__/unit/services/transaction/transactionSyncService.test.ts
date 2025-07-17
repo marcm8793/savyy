@@ -23,23 +23,6 @@ vi.mock("../../../../src/services/tinkService", () => {
   };
 });
 
-// Mock encryption service before importing anything that uses it
-vi.mock("../../../../src/services/encryptionService", () => {
-  const mockEncryptionService = {
-    encrypt: vi.fn().mockResolvedValue({
-      encryptedData: "encrypted-data",
-      iv: "mock-iv",
-      authTag: "mock-auth-tag",
-      keyId: "mock-key-id",
-    }),
-    decrypt: vi.fn().mockResolvedValue("decrypted-data"),
-    getActiveKeyId: vi.fn().mockResolvedValue("mock-key-id"),
-  };
-  return {
-    getEncryptionService: vi.fn(() => mockEncryptionService),
-    resetEncryptionService: vi.fn(),
-  };
-});
 
 // Mock the AI categorization service
 vi.mock("../../../../src/services/transaction/aiCategorizationService", () => {

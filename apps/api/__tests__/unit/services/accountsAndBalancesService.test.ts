@@ -7,23 +7,6 @@ import { httpRetry } from "../../../src/utils/httpRetry";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { schema, BankAccount } from "../../../db/schema";
 
-// Mock the encryption service
-vi.mock("../../../src/services/encryptionService", () => ({
-  getEncryptionService: vi.fn(() => ({
-    encrypt: vi.fn((data: string) => ({
-      encryptedData: `encrypted_${data}`,
-      iv: "mock_iv",
-      authTag: "mock_auth_tag",
-      keyId: "mock_key_id",
-    })),
-    decrypt: vi.fn((data: any) => {
-      if (data.encryptedData.startsWith("encrypted_")) {
-        return data.encryptedData.replace("encrypted_", "");
-      }
-      return data.encryptedData;
-    }),
-  })),
-}));
 
 // Mock the httpRetry utility
 vi.mock("../../../src/utils/httpRetry", () => ({
@@ -99,14 +82,6 @@ const mockBankAccount: BankAccount = {
   accessToken: "access-token-123",
   tokenExpiresAt: new Date(Date.now() + 3600 * 1000),
   tokenScope: "accounts:read balances:read",
-  // Encrypted fields
-  encryptedIban: "encrypted_DE89370400440532013000",
-  encryptedIbanIv: "mock_iv",
-  encryptedIbanAuthTag: "mock_auth_tag",
-  encryptedAccessToken: "encrypted_access-token-123",
-  encryptedAccessTokenIv: "mock_iv",
-  encryptedAccessTokenAuthTag: "mock_auth_tag",
-  encryptionKeyId: "mock_key_id",
   createdAt: new Date("2024-01-01T00:00:00Z"),
   updatedAt: new Date("2024-01-15T10:30:00Z"),
 };
@@ -716,14 +691,6 @@ describe("AccountsAndBalancesService", () => {
           balance: "150000", // 1500.00 * 100 as string
           currency: "EUR",
           iban: mockTinkAccount.identifiers?.iban?.iban,
-          // Encrypted fields should be present
-          encryptedIban: expect.stringContaining("encrypted_"),
-          encryptedIbanIv: "mock_iv",
-          encryptedIbanAuthTag: "mock_auth_tag",
-          encryptedAccessToken: expect.stringContaining("encrypted_"),
-          encryptedAccessTokenIv: "mock_iv",
-          encryptedAccessTokenAuthTag: "mock_auth_tag",
-          encryptionKeyId: "mock_key_id",
         })
       );
     });
@@ -952,10 +919,6 @@ describe("AccountsAndBalancesService", () => {
           balance: "200000", // 2000 * 100 as string
           currency: "EUR",
           accessToken: "new-access-token",
-          // Should include encrypted fields
-          encryptedIban: expect.stringContaining("encrypted_"),
-          encryptedAccessToken: expect.stringContaining("encrypted_"),
-          encryptionKeyId: "mock_key_id",
         })
       );
       expect(result).toBeDefined();

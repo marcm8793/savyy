@@ -22,7 +22,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import { useUserDisplayData } from "@/hooks/use-decrypted-user";
+import { useUserDisplayData } from "@/hooks/use-user";
 import Image from "next/image";
 
 // This is sample data for navigation and projects - keeping this for non-user data

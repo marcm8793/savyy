@@ -27,11 +27,6 @@ export const user = pgTable("user", {
   image: text("image"),
   role: userRole("role").default("user").notNull(),
   tinkUserId: text("tink_user_id"),
-  // Encrypted fields (keeping only tinkUserId encryption)
-  encryptedTinkUserId: text("encrypted_tink_user_id"),
-  encryptedTinkUserIdIv: text("encrypted_tink_user_id_iv"),
-  encryptedTinkUserIdAuthTag: text("encrypted_tink_user_id_auth_tag"),
-  encryptionKeyId: text("encryption_key_id"),
 
   // Timestamps
   // Use $defaultFn to set default values for createdAt and updatedAt
@@ -124,14 +119,6 @@ export const bankAccount = pgTable("bank_accounts", {
   accessToken: text("access_token"), // access_token from OAuth response
   tokenExpiresAt: timestamp("token_expires_at"), // calculated from expires_in
   tokenScope: varchar("token_scope", { length: 255 }), // scope from OAuth response
-  // Encrypted fields
-  encryptedIban: text("encrypted_iban"),
-  encryptedIbanIv: text("encrypted_iban_iv"),
-  encryptedIbanAuthTag: text("encrypted_iban_auth_tag"),
-  encryptedAccessToken: text("encrypted_access_token"),
-  encryptedAccessTokenIv: text("encrypted_access_token_iv"),
-  encryptedAccessTokenAuthTag: text("encrypted_access_token_auth_tag"),
-  encryptionKeyId: text("encryption_key_id"),
 
   // Timestamps
   createdAt: timestamp("created_at")
@@ -200,19 +187,6 @@ export const transaction = pgTable("transactions", {
   payeeAccountNumber: varchar("payee_account_number", { length: 50 }), // counterparties.payee.identifiers.financialInstitution.accountNumber
   payerName: varchar("payer_name", { length: 255 }), // counterparties.payer.name
   payerAccountNumber: varchar("payer_account_number", { length: 50 }), // counterparties.payer.identifiers.financialInstitution.accountNumber
-
-  // Encrypted counterparty fields
-  encryptedPayeeAccountNumber: text("encrypted_payee_account_number"),
-  encryptedPayeeAccountNumberIv: text("encrypted_payee_account_number_iv"),
-  encryptedPayeeAccountNumberAuthTag: text(
-    "encrypted_payee_account_number_auth_tag"
-  ),
-  encryptedPayerAccountNumber: text("encrypted_payer_account_number"),
-  encryptedPayerAccountNumberIv: text("encrypted_payer_account_number_iv"),
-  encryptedPayerAccountNumberAuthTag: text(
-    "encrypted_payer_account_number_auth_tag"
-  ),
-  encryptionKeyId: text("encryption_key_id"),
 
   // Mutability
   providerMutability: varchar("provider_mutability", { length: 50 }), // providerMutability

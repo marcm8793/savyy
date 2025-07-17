@@ -2,11 +2,6 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, and } from "drizzle-orm";
 import { BankAccount, bankAccount, schema } from "../../db/schema";
 import { httpRetry } from "../utils/httpRetry";
-import { getEncryptionService } from "./encryptionService";
-import {
-  encryptionResultToFields,
-  encryptedFieldToResult,
-} from "../types/encryption";
 
 // Types based on Tink API documentation
 interface CurrencyDenominatedAmount {
@@ -116,7 +111,6 @@ interface SyncMode {
 
 export class AccountsAndBalancesService {
   private readonly baseUrl: string;
-  private readonly encryptionService = getEncryptionService();
 
   constructor() {
     this.baseUrl = process.env.TINK_API_URL || "https://api.tink.com";
@@ -174,98 +168,6 @@ export class AccountsAndBalancesService {
       });
       return null;
     }
-  }
-  /**
-   * Decrypt sensitive account fields
-   */
-  private async decryptAccount(account: BankAccount): Promise<BankAccount> {
-    const decryptedAccount = { ...account };
-
-    // Decrypt IBAN if encrypted
-    if (
-      account.encryptedIban &&
-      account.encryptedIbanIv &&
-      account.encryptedIbanAuthTag &&
-      account.encryptionKeyId
-    ) {
-      const encryptedIban = encryptedFieldToResult({
-        encryptedData: account.encryptedIban,
-        iv: account.encryptedIbanIv,
-        authTag: account.encryptedIbanAuthTag,
-        keyId: account.encryptionKeyId,
-      });
-      if (encryptedIban) {
-        decryptedAccount.iban = await this.encryptionService.decrypt(
-          encryptedIban
-        );
-      }
-    }
-
-    // Decrypt access token if encrypted
-    if (
-      account.encryptedAccessToken &&
-      account.encryptedAccessTokenIv &&
-      account.encryptedAccessTokenAuthTag &&
-      account.encryptionKeyId
-    ) {
-      const encryptedAccessToken = encryptedFieldToResult({
-        encryptedData: account.encryptedAccessToken,
-        iv: account.encryptedAccessTokenIv,
-        authTag: account.encryptedAccessTokenAuthTag,
-        keyId: account.encryptionKeyId,
-      });
-      if (encryptedAccessToken) {
-        decryptedAccount.accessToken = await this.encryptionService.decrypt(
-          encryptedAccessToken
-        );
-      }
-    }
-
-    return decryptedAccount;
-  }
-
-  /**
-   * Encrypt sensitive fields for storage
-   */
-  private async encryptAccountData(
-    iban: string | null,
-    accessToken: string | null
-  ) {
-    const encryptedFields: {
-      encryptedIban?: string | null;
-      encryptedIbanIv?: string | null;
-      encryptedIbanAuthTag?: string | null;
-      encryptedAccessToken?: string | null;
-      encryptedAccessTokenIv?: string | null;
-      encryptedAccessTokenAuthTag?: string | null;
-      encryptionKeyId?: string | null;
-    } = {};
-
-    // Encrypt IBAN if provided
-    if (iban) {
-      const encryptedIban = await this.encryptionService.encrypt(iban);
-      const ibanFields = encryptionResultToFields(encryptedIban);
-      encryptedFields.encryptedIban = ibanFields.encryptedData;
-      encryptedFields.encryptedIbanIv = ibanFields.iv;
-      encryptedFields.encryptedIbanAuthTag = ibanFields.authTag;
-      encryptedFields.encryptionKeyId = ibanFields.keyId;
-    }
-
-    // Encrypt access token if provided
-    if (accessToken) {
-      const encryptedAccessToken = await this.encryptionService.encrypt(
-        accessToken
-      );
-      const tokenFields = encryptionResultToFields(encryptedAccessToken);
-      encryptedFields.encryptedAccessToken = tokenFields.encryptedData;
-      encryptedFields.encryptedAccessTokenIv = tokenFields.iv;
-      encryptedFields.encryptedAccessTokenAuthTag = tokenFields.authTag;
-      if (!encryptedFields.encryptionKeyId) {
-        encryptedFields.encryptionKeyId = tokenFields.keyId;
-      }
-    }
-
-    return encryptedFields;
   }
 
   /**
@@ -418,8 +320,7 @@ export class AccountsAndBalancesService {
       accounts = await baseQuery;
     }
 
-    // Decrypt sensitive fields before returning
-    return Promise.all(accounts.map((account) => this.decryptAccount(account)));
+    return accounts;
   }
 
   /**
@@ -472,10 +373,9 @@ export class AccountsAndBalancesService {
           )
         );
 
-      // Check each account for IBAN match (need to decrypt to compare)
+      // Check each account for IBAN match
       for (const account of potentialMatches) {
-        const decryptedAccount = await this.decryptAccount(account);
-        if (decryptedAccount.iban === tinkAccount.identifiers.iban.iban) {
+        if (account.iban === tinkAccount.identifiers.iban.iban) {
           return {
             isDuplicate: true,
             existingAccount: account,
@@ -711,12 +611,6 @@ export class AccountsAndBalancesService {
     credentialsId?: string
     // Note: refreshToken parameter removed
   ): Promise<BankAccount> {
-    // Encrypt sensitive data
-    const encryptedFields = await this.encryptAccountData(
-      tinkAccount.identifiers?.iban?.iban || null,
-      userAccessToken
-    );
-
     // Fetch consent expiry data
     const consentExpiryDate = await this.fetchConsentExpiryData(
       userAccessToken,
@@ -733,12 +627,8 @@ export class AccountsAndBalancesService {
         : existingAccount.balance,
       currency:
         tinkAccount.processedBalance?.currency || existingAccount.currency,
-      // TODO: Keep plain fields for now (will be removed after migration)
       iban: tinkAccount.identifiers?.iban?.iban || existingAccount.iban,
       accessToken: userAccessToken,
-      // refreshToken: removed as not provided by Tink
-      // Set encrypted fields
-      ...encryptedFields,
       lastRefreshed: tinkAccount.dates?.lastRefreshed
         ? new Date(tinkAccount.dates.lastRefreshed)
         : new Date(),
@@ -763,7 +653,7 @@ export class AccountsAndBalancesService {
       tokenExpiresAt: result.tokenExpiresAt,
     });
 
-    return this.decryptAccount(result);
+    return result;
   }
 
   /**
@@ -779,12 +669,6 @@ export class AccountsAndBalancesService {
     credentialsId?: string
     // Note: refreshToken parameter removed
   ): Promise<BankAccount> {
-    // Encrypt sensitive data
-    const encryptedFields = await this.encryptAccountData(
-      tinkAccount.identifiers?.iban?.iban || null,
-      userAccessToken
-    );
-
     // Fetch consent expiry data
     const consentExpiryDate = await this.fetchConsentExpiryData(
       userAccessToken,
@@ -802,12 +686,8 @@ export class AccountsAndBalancesService {
         ? Math.round(tinkAccount.processedBalance.amount * 100).toString()
         : null,
       currency: tinkAccount.processedBalance?.currency || "EUR",
-      // TODO: Keep plain fields for now (will be removed after migration)
       iban: tinkAccount.identifiers?.iban?.iban || null,
       accessToken: userAccessToken,
-      // refreshToken: removed as not provided by Tink
-      // Set encrypted fields
-      ...encryptedFields,
       lastRefreshed: tinkAccount.dates?.lastRefreshed
         ? new Date(tinkAccount.dates.lastRefreshed)
         : null,
@@ -826,7 +706,7 @@ export class AccountsAndBalancesService {
     const result = inserted[0];
     console.log("Created new account:", result.accountName);
 
-    return this.decryptAccount(result);
+    return result;
   }
 }
 

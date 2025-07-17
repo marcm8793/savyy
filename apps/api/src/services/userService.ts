@@ -2,8 +2,6 @@ import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { user, schema, User } from "../../db/schema";
 import { splitNameWithFallbacks } from "../utils/auth";
-import { getEncryptionService } from "./encryptionService";
-import { encryptionResultToFields } from "../types/encryption";
 
 export class UserService {
   /**
@@ -14,22 +12,10 @@ export class UserService {
     userId: string,
     tinkUserId: string
   ): Promise<User> {
-    // Initialize encryption service
-    const encryptionService = getEncryptionService();
-    await encryptionService.waitForInitialization();
-
-    // Encrypt the Tink user ID
-    const encryptedTinkUserId = await encryptionService.encrypt(tinkUserId);
-    const tinkUserIdFields = encryptionResultToFields(encryptedTinkUserId);
-
     const result = await db
       .update(user)
       .set({
         tinkUserId,
-        encryptedTinkUserId: tinkUserIdFields.encryptedData,
-        encryptedTinkUserIdIv: tinkUserIdFields.iv,
-        encryptedTinkUserIdAuthTag: tinkUserIdFields.authTag,
-        encryptionKeyId: tinkUserIdFields.keyId,
         updatedAt: new Date(),
       })
       .where(eq(user.id, userId))

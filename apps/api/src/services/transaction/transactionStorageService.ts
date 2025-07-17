@@ -6,7 +6,6 @@ import {
   AICategorizationService,
   CategorizationResult,
 } from "./aiCategorizationService";
-import { getEncryptionService } from "../encryptionService";
 
 /**
  * Service responsible for storing transactions in the database
@@ -15,7 +14,6 @@ import { getEncryptionService } from "../encryptionService";
  */
 export class TransactionStorageService {
   private readonly BATCH_SIZE = 50;
-  private readonly encryptionService = getEncryptionService();
   private readonly aiCategorizationService = new AICategorizationService();
 
   /**

@@ -3,7 +3,7 @@
 import { useSession } from "../../lib/auth-client";
 import { trpc } from "../../lib/trpc";
 import { config } from "../../lib/config";
-import { useDecryptedUser } from "@/hooks/use-decrypted-user";
+import { useUser } from "@/hooks/use-user";
 
 export function AuthDebug() {
   const {
@@ -13,10 +13,10 @@ export function AuthDebug() {
   } = useSession();
   const trpcSessionQuery = trpc.auth.getSession.useQuery();
   const {
-    user: decryptedUser,
-    isLoading: decryptedLoading,
+    user,
+    isLoading: userLoading,
     isAuthenticated,
-  } = useDecryptedUser();
+  } = useUser();
 
   return (
     <div className="p-6 border rounded-lg space-y-4 bg-gray-50 dark:bg-gray-800">
@@ -80,35 +80,35 @@ export function AuthDebug() {
         <h3 className="font-semibold">User Data via tRPC:</h3>
         <div className="bg-green-50 p-3 rounded text-sm dark:bg-gray-700">
           <p>
-            <strong>Loading:</strong> {decryptedLoading ? "Yes" : "No"}
+            <strong>Loading:</strong> {userLoading ? "Yes" : "No"}
           </p>
           <p>
             <strong>Authenticated:</strong> {isAuthenticated ? "Yes" : "No"}
           </p>
           <p>
-            <strong>User exists:</strong> {decryptedUser ? "Yes" : "No"}
+            <strong>User exists:</strong> {user ? "Yes" : "No"}
           </p>
-          {decryptedUser && (
+          {user && (
             <>
               <p>
-                <strong>User ID:</strong> {decryptedUser.id}
+                <strong>User ID:</strong> {user.id}
               </p>
               <p>
                 <strong>Email:</strong>{" "}
                 <span className="text-green-600 font-semibold">
-                  {decryptedUser.email}
+                  {user.email}
                 </span>
               </p>
               <p>
-                <strong>Name:</strong> {decryptedUser.name || "Not set"}
+                <strong>Name:</strong> {user.name || "Not set"}
               </p>
               <p>
                 <strong>First Name:</strong>{" "}
-                {decryptedUser.firstName || "Not set"}
+                {user.firstName || "Not set"}
               </p>
               <p>
                 <strong>Last Name:</strong>{" "}
-                {decryptedUser.lastName || "Not set"}
+                {user.lastName || "Not set"}
               </p>
             </>
           )}

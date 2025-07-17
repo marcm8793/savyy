@@ -64,7 +64,6 @@ import { getCategoryIcon, getCategoryColor } from "@/lib/category-icons";
 // Use the transaction type but with serialized dates (as they come from tRPC)
 type Transaction = {
   id: string;
-  encryptionKeyId: string | null;
   userId: string;
   tinkTransactionId: string;
   tinkAccountId: string;

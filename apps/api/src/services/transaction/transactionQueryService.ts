@@ -1,8 +1,6 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
 import { schema, Transaction, transaction } from "../../../db/schema";
-import { getEncryptionService } from "../encryptionService";
-import { encryptedFieldToResult } from "../../types/encryption";
 
 // Types based on Tink API structure
 export interface TinkTransactionFilters {
@@ -24,56 +22,6 @@ export interface TinkTransactionResponse {
  * Handles Tink-style transaction filtering and querying operations
  */
 export class TransactionQueryService {
-  private readonly encryptionService = getEncryptionService();
-
-  /**
-   * Decrypt sensitive fields in a transaction
-   */
-  private async decryptTransaction(
-    transaction: Transaction
-  ): Promise<Transaction> {
-    const decryptedTransaction = { ...transaction };
-
-    // Decrypt payee account number if encrypted
-    if (
-      transaction.encryptedPayeeAccountNumber &&
-      transaction.encryptedPayeeAccountNumberIv &&
-      transaction.encryptedPayeeAccountNumberAuthTag &&
-      transaction.encryptionKeyId
-    ) {
-      const encryptedPayee = encryptedFieldToResult({
-        encryptedData: transaction.encryptedPayeeAccountNumber,
-        iv: transaction.encryptedPayeeAccountNumberIv,
-        authTag: transaction.encryptedPayeeAccountNumberAuthTag,
-        keyId: transaction.encryptionKeyId,
-      });
-      if (encryptedPayee) {
-        decryptedTransaction.payeeAccountNumber =
-          await this.encryptionService.decrypt(encryptedPayee);
-      }
-    }
-
-    // Decrypt payer account number if encrypted
-    if (
-      transaction.encryptedPayerAccountNumber &&
-      transaction.encryptedPayerAccountNumberIv &&
-      transaction.encryptedPayerAccountNumberAuthTag &&
-      transaction.encryptionKeyId
-    ) {
-      const encryptedPayer = encryptedFieldToResult({
-        encryptedData: transaction.encryptedPayerAccountNumber,
-        iv: transaction.encryptedPayerAccountNumberIv,
-        authTag: transaction.encryptedPayerAccountNumberAuthTag,
-        keyId: transaction.encryptionKeyId,
-      });
-      if (encryptedPayer) {
-        decryptedTransaction.payerAccountNumber =
-          await this.encryptionService.decrypt(encryptedPayer);
-      }
-    }
-
-    return decryptedTransaction;
-  }
 
   // Get transactions with Tink-style filtering
   async getTransactions(
@@ -109,13 +57,8 @@ export class TransactionQueryService {
       .where(and(...conditions))
       .limit(pageSize);
 
-    // Decrypt sensitive fields before returning
-    const decryptedResults = await Promise.all(
-      results.map((t) => this.decryptTransaction(t))
-    );
-
     return {
-      transactions: decryptedResults,
+      transactions: results,
       // In a real implementation, you'd generate the next page token based on the last result
       //       pageToken is accepted but never used – pagination is incomplete
       // The service advertises token-based pagination, yet the implementation ignores pageToken and always starts from the first row, returning a placeholder token.
@@ -162,10 +105,7 @@ export class TransactionQueryService {
         )
       )
       .limit(1);
-    const transactionResult = result[0] || null;
-    return transactionResult
-      ? await this.decryptTransaction(transactionResult)
-      : null;
+    return result[0] || null;
   }
 
   // Update transaction
@@ -185,10 +125,7 @@ export class TransactionQueryService {
         )
       )
       .returning();
-    const updatedTransaction = result[0];
-    return updatedTransaction
-      ? await this.decryptTransaction(updatedTransaction)
-      : undefined;
+    return result[0];
   }
 
   // Delete transaction

@@ -3,7 +3,7 @@
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { useDecryptedUser } from "@/hooks/use-decrypted-user";
+import { useUser } from "@/hooks/use-user";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import {
   Breadcrumb,
@@ -22,7 +22,7 @@ import { DashboardContent } from "@/components/dashboard";
 
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
-  const { user, isLoading: userLoading, isAuthenticated } = useDecryptedUser();
+  const { user, isLoading: userLoading, isAuthenticated } = useUser();
   const router = useRouter();
 
   useEffect(() => {

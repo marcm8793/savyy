@@ -4,14 +4,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "../../lib/trpc";
 import { useSession, authClient } from "../../lib/auth-client";
 import { useRouter } from "next/navigation";
-import { useDecryptedUser } from "@/hooks/use-decrypted-user";
+import { useUser } from "@/hooks/use-user";
 
 export function UserProfile() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  // Get decrypted user data
-  const { user, isLoading, isAuthenticated, error } = useDecryptedUser();
+  // Get user data
+  const { user, isLoading, isAuthenticated, error } = useUser();
 
   // Get session from Better Auth (for comparison/debugging)
   const { data: session } = useSession();

@@ -1,7 +1,7 @@
 import { useSession } from "@/lib/auth-client";
 import { trpc } from "@/lib/trpc";
 
-export interface DecryptedUser {
+export interface User {
   id: string;
   name: string;
   firstName?: string | null;
@@ -14,26 +14,25 @@ export interface DecryptedUser {
   updatedAt: string;
 }
 
-export interface UseDecryptedUserResult {
-  user: DecryptedUser | null;
+export interface UseUserResult {
+  user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   error: unknown;
 }
 
 /**
- * Custom hook that provides decrypted user data
+ * Custom hook that provides user data
  *
- * This hook prioritizes tRPC session data (which contains decrypted emails)
- * over Better Auth session data (which contains hashed emails for security).
+ * This hook prioritizes tRPC session data over Better Auth session data.
  *
  * Data Priority:
- * 1. tRPC session data (contains decrypted email) - PRIMARY
+ * 1. tRPC session data - PRIMARY
  * 2. Better Auth session data (for authentication state) - FALLBACK
  *
- * @returns Decrypted user data with proper loading states
+ * @returns User data with proper loading states
  */
-export function useDecryptedUser(): UseDecryptedUserResult {
+export function useUser(): UseUserResult {
   // Get Better Auth session for authentication state
   const {
     data: session,
@@ -41,7 +40,7 @@ export function useDecryptedUser(): UseDecryptedUserResult {
     error: sessionError,
   } = useSession();
 
-  // Get tRPC session data which contains decrypted user information
+  // Get tRPC session data which contains user information
   const trpcSession = trpc.auth.getSession.useQuery(undefined, {
     enabled: !!session?.user, // Only fetch if we have a session
     retry: 3,
@@ -60,7 +59,7 @@ export function useDecryptedUser(): UseDecryptedUserResult {
     !trpcSession.error &&
     (trpcSession.data?.isAuthenticated ?? false);
 
-  // Get user data - prioritize decrypted tRPC data
+  // Get user data - prioritize tRPC data
   const user = trpcSession.data?.user || null;
 
   // Handle errors
@@ -115,7 +114,7 @@ function generateInitials(
  * @returns User data suitable for UI display with proper fallbacks
  */
 export function useUserDisplayData() {
-  const { user, isLoading, isAuthenticated } = useDecryptedUser();
+  const { user, isLoading, isAuthenticated } = useUser();
 
   if (isLoading) {
     return {

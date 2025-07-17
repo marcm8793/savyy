@@ -6,7 +6,7 @@ import { tinkService } from "../services/tinkService";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { AccountsAndBalancesService } from "../services/accountsAndBalancesService.js";
 import { tokenService } from "../services/tokenService";
-import { redisService } from "../services/redisService";
+import { redisService } from "../servicesv2/redisService";
 import { TransactionSyncService } from "../services/transaction/transactionSyncService";
 import { TRANSACTION_SYNC_CONFIG } from "../constants/transactions";
 

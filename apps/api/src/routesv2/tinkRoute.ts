@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { TokenService } from "../servicesv2/tokenService";
-import { redisService } from "../services/redisService";
+import { redisService } from "../servicesv2/redisService";
 
 // Validation schema for Tink callback query parameters
 const callbackQuerySchema = z.object({

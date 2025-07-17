@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import { redisService } from "../services/redisService";
+import { redisService } from "../servicesv2/redisService";
 
 const healthRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/health/db", async function (request, reply) {
